@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#121212">
+<link rel="manifest" href='data:application/manifest+json,{"display":"standalone","start_url":"./index.html","name":"AJ 스마트 계산기","short_name":"AJ계산기","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/564/564429.png","sizes":"512x512","type":"image/png"}]}' />
 <title>A♥️J 스마트 메모 계산기</title>
 
 <style>
@@ -311,6 +312,13 @@ display.addEventListener('input', () => { previewCalc(); persist(); });
 const saved = localStorage.getItem("calcValue");
 if(saved) display.innerHTML = saved; else renderDisplay();
 previewCalc();
+</script>
+
+<script>
+// PWA 서비스 워커 등록
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('data:text/javascript;base64,c2VsZi.hWRGZ2ZW50TGlzdGVuZXIoJ2ZldGNoJywgZnVuY3Rpb24oZXZlbnQpIHsgZXZlbnQucmVzcG9uZFdpdGgoZmV0Y2goZXZlbnQucmVxdWVzdCkpOyB9KTs=');
+}
 </script>
 </body>
 </html>
