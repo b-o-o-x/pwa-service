@@ -71,7 +71,6 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
 
-        /* 모달 스타일 */
         #infoModal, #modalOverlay { display: none; }
         #modalOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99; }
         #infoModal {
@@ -84,7 +83,7 @@
 <body onload="initApp()">
 
 <header>
-    <div class="logo">✨ Smart Memo Pro</div>
+    <div class="logo">✨ Smart Memo v3.5</div>
     <div class="menu-icons">
         <button class="icon-btn" onclick="downloadMemo()" title="파일로 저장">📥</button>
         <button class="icon-btn" onclick="changeTheme()" title="테마 변경">🎨</button>
@@ -93,16 +92,16 @@
 </header>
 
 <main>
-    <textarea id="memoEditor" placeholder="여기에 메모하세요.&#10;1,200 + 3,800 = 자동으로 계산됩니다."></textarea>
+    <textarea id="memoEditor" placeholder="[새로운 기능 예시]&#10;3(4인실) + 10 = 13&#10;5,000 * 10% = 500"></textarea>
 </main>
 
 <div id="modalOverlay" onclick="toggleInfo()"></div>
 <div id="infoModal">
-    <h2 style="margin-bottom: 10px;">Smart Memo Pro</h2>
-    <p>버전: 3.0 (PWA 지원)</p>
+    <h2 style="margin-bottom: 10px;">AJ Smart Memopad Pro</h2>
+    <p>버전: 3.5 (PWA 지원)</p>
     <p>개발: 양승민 (Gemini AI)</p>
     <hr style="margin: 15px 0; border: 0; border-top: 1px solid var(--border-color);">
-    <p style="font-size: 0.9rem; opacity: 0.8;">모든 내용은 브라우저에 자동 저장됩니다.</p>
+    <p style="font-size: 0.9rem; opacity: 0.8;">문자가 포함된 괄호는 계산에서 제외됩니다.</p>
     <button onclick="toggleInfo()" style="margin-top: 20px; padding: 10px 20px; cursor: pointer; border-radius: 8px; border: none; background: var(--accent-color); color: white;">확인</button>
 </div>
 
@@ -111,26 +110,20 @@
     const themes = ['', 'dark', 'green', 'pink'];
     let currentThemeIdx = 0;
 
-    // 1. 초기화: 저장된 데이터 및 테마 불러오기
     function initApp() {
         const savedData = localStorage.getItem('smartMemoContent');
         if (savedData) memo.value = savedData;
-
         const savedTheme = localStorage.getItem('smartMemoTheme');
         if (savedTheme) {
             currentThemeIdx = parseInt(savedTheme);
             document.body.className = themes[currentThemeIdx];
         }
-        
         registerServiceWorker();
     }
 
-    // 2. 자동 저장 및 계산 로직
     memo.addEventListener('input', (e) => {
-        // 자동 저장
         localStorage.setItem('smartMemoContent', memo.value);
 
-        // '=' 입력 시 계산 수행
         if (e.data === '=') {
             const value = memo.value;
             const pos = memo.selectionStart;
@@ -138,11 +131,23 @@
             let currentLine = lines[lines.length - 1];
 
             const hasComma = currentLine.includes(',');
-            let cleanExpr = currentLine.replace(/[^-0-9+*/().,]/g, '').replace(/,/g, '').replace(/=/g, '');
+
+            // 1. 문자가 포함된 괄호 영역 제거 (예: (4인실) -> 공백처리)
+            // 한글([가-힣]) 또는 영문([a-zA-Z])이 들어있는 괄호만 삭제
+            let processedLine = currentLine.replace(/\([^)]*[가-힣a-zA-Z][^)]*\)/g, '');
+
+            // 2. % 연산 처리: 숫자% 형태를 (숫자/100)으로 변환
+            processedLine = processedLine.replace(/([0-9.,]+)%/g, '($1/100)');
+
+            // 3. 계산을 위한 순수 수식 추출 (숫자, 연산자, 소수점, 괄호만 남김)
+            let cleanExpr = processedLine.replace(/[^-0-9+*/().,]/g, '').replace(/,/g, '').replace(/=/g, '');
 
             try {
                 if (cleanExpr.trim() !== '') {
                     let result = eval(cleanExpr);
+                    // 결과가 실수인 경우 소수점 2자리까지 표시 (필요시 수정 가능)
+                    if (!Number.isInteger(result)) result = Math.round(result * 100) / 100;
+                    
                     let formattedResult = hasComma ? result.toLocaleString() : result;
                     
                     const before = value.substring(0, pos);
@@ -151,29 +156,34 @@
                     
                     const newPos = pos + String(formattedResult).length;
                     memo.setSelectionRange(newPos, newPos);
-                    
-                    // 계산된 결과도 저장
                     localStorage.setItem('smartMemoContent', memo.value);
                 }
-            } catch (err) { /* 수식 오류 무시 */ }
+            } catch (err) { console.log("계산 오류"); }
         }
     });
 
-    // 3. 파일 다운로드 기능
+    // 파일 다운로드 (포맷: memo_YYYYMMDD_HHMMSS.txt)
     function downloadMemo() {
         const text = memo.value;
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        
+        const filename = `memo_${year}${month}${day}_${hh}${mm}${ss}.txt`;
+        
         const blob = new Blob([text], { type: 'text/plain' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        const date = new Date().toISOString().slice(0, 10);
-        
         a.href = url;
-        a.download = `memo_${date}.txt`;
+        a.download = filename;
         a.click();
         window.URL.revokeObjectURL(url);
     }
 
-    // 4. 테마 변경 (저장 기능 포함)
     function changeTheme() {
         currentThemeIdx = (currentThemeIdx + 1) % themes.length;
         document.body.className = themes[currentThemeIdx];
@@ -186,20 +196,14 @@
         document.getElementById('modalOverlay').style.display = isVisible ? 'none' : 'block';
     }
 
-    // 5. 인라인 서비스 워커 등록 (PWA용)
     function registerServiceWorker() {
         if ('serviceWorker' in navigator) {
-            const swCode = `
-                self.addEventListener('install', (e) => self.skipWaiting());
-                self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request).catch(() => {})));
-            `;
+            const swCode = `self.addEventListener('install', (e) => self.skipWaiting()); self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request).catch(() => {})));`;
             const blob = new Blob([swCode], { type: 'application/javascript' });
-            const swUrl = URL.createObjectURL(blob);
-            navigator.serviceWorker.register(swUrl);
+            navigator.serviceWorker.register(URL.createObjectURL(blob));
         }
     }
 
-    // 탭 키 지원
     memo.addEventListener('keydown', (e) => {
         if (e.key === 'Tab') {
             e.preventDefault();
