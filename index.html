@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Innosoft Tools Hub</title>
+
+<style>
+:root{
+    --bg:#0f172a;
+    --card:#111827;
+    --accent:#38bdf8;
+    --text:#e5e7eb;
+    --sub:#94a3b8;
+}
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family: "Segoe UI", Pretendard, sans-serif;
+}
+
+body{
+    background:linear-gradient(135deg,#020617,#0f172a);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+}
+
+header{
+    text-align:center;
+    padding:50px 20px 30px;
+}
+
+header h1{
+    font-size:28px;
+    font-weight:600;
+    letter-spacing:1px;
+}
+
+header p{
+    margin-top:8px;
+    color:var(--sub);
+    font-size:14px;
+}
+
+.container{
+    width:100%;
+    max-width:900px;
+    padding:20px;
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+}
+
+.card{
+    background:var(--card);
+    border-radius:16px;
+    padding:22px;
+    text-decoration:none;
+    color:var(--text);
+    transition:0.25s;
+    border:1px solid rgba(255,255,255,0.05);
+    position:relative;
+    overflow:hidden;
+}
+
+.card:hover{
+    transform:translateY(-6px);
+    border-color:var(--accent);
+    box-shadow:0 10px 25px rgba(0,0,0,0.4);
+}
+
+.card::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(120deg,transparent,rgba(56,189,248,0.15));
+    opacity:0;
+    transition:0.3s;
+}
+
+.card:hover::after{
+    opacity:1;
+}
+
+.card h2{
+    font-size:18px;
+    margin-bottom:8px;
+}
+
+.card p{
+    font-size:13px;
+    color:var(--sub);
+}
+
+footer{
+    margin-top:auto;
+    padding:30px;
+    font-size:12px;
+    color:#64748b;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>🧩 Innosoft PWA Tools Hub</h1>
+    <p>이노소프트 PWA 도구 모음 페이지</p>
+</header>
+
+<div class="container">
+
+    <!-- 링크 카드 1 -->
+    <a class="card" href="shop-memo-calculator/index.html">
+        <h2>🛒 쇼핑 메모 계산기</h2>
+        <p>제품 이름을 쓰며 금액 계산 (Redo/Undo, History, ...)</p>
+    </a>
+
+    <!-- 링크 카드 2 -->
+    <a class="card" href="smart-memo/index.html">
+        <h2>🧠 스마트 메모장</h2>
+        <p>빠르게 기록하고 정리하는 메모 (자동 계산 기능 3+4=)</p>
+    </a>
+
+    <!-- 링크 카드 3 -->
+    <a class="card" href="cloud-memo/index.html">
+        <h2>☁️ 클라우드 메모장</h2>
+        <p>언제 어디서나 이어지는 메모</p>
+    </a>
+
+    <!-- 🔽 앞으로 추가 영역 -->
+    <!--
+    <a class="card" href="new-tool/index.html">
+        <h2>✨ 새 프로젝트</h2>
+        <p>설명 추가</p>
+    </a>
+    -->
+
+</div>
+
+<footer>
+    © 2026 Innosoft Tools
+</footer>
+
+</body>
+</html>
