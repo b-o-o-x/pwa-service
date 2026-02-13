@@ -2,31 +2,41 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href='data:application/manifest+json,{"name":"A❤️J 클라우드 메모","short_name":"A❤️J클라우드메모","start_url":".","display":"standalone","background_color":"#ffffff","theme_color":"#007bff","icons":[{"src":"https://b-o-o-x.github.io/pwa/cloud-memo/cloud-memo-512.png","sizes":"512x512","type":"image/png"}]}'>
     <title>A❤️J 클라우드 메모</title>
     <link id="manifest-link" rel="manifest">
     <style>
         :root { --primary: #4285f4; --bg: #f0f2f5; }
         body { font-family: 'Apple SD Gothic Neo', sans-serif; margin: 0; background: var(--bg); -webkit-tap-highlight-color: transparent; }
+        
+        /* 헤더 */
         .header { background: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 10; }
         
+        /* 목록 뷰 */
         #listView { padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; }
-        .post-it { background: #fff9c4; padding: 15px; height: 140px; border-radius: 8px; box-shadow: 2px 2px 8px rgba(0,0,0,0.1); cursor: pointer; display: flex; flex-direction: column; transition: 0.2s; border: 1px solid #f0e68c; }
+        .post-it { padding: 15px; height: 140px; border-radius: 12px; box-shadow: 2px 4px 10px rgba(0,0,0,0.08); cursor: pointer; display: flex; flex-direction: column; transition: 0.2s; border: 1px solid rgba(0,0,0,0.05); }
         .post-it:active { transform: scale(0.95); }
-        .post-it .preview { font-size: 0.95em; color: #333; flex-grow: 1; overflow: hidden; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
-        .post-it .date { font-size: 0.75em; color: #997d00; margin-top: 8px; text-align: right; }
+        .post-it .preview { font-size: 0.95em; color: #333; flex-grow: 1; overflow: hidden; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; word-break: break-all; }
+        .post-it .date { font-size: 0.7em; color: rgba(0,0,0,0.5); margin-top: 8px; text-align: right; }
         
-        #detailView { display: none; padding: 20px; height: calc(100vh - 40px); flex-direction: column; box-sizing: border-box; background: white; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 20; }
-        textarea { width: 100%; flex-grow: 1; border: 1px solid #eee; padding: 15px; border-radius: 10px; font-size: 1.1em; resize: none; box-sizing: border-box; background: #fffdf0; margin-bottom: 10px; }
-        textarea:focus { outline: none; border-color: #ffd700; }
+        /* 상세 뷰 */
+        #detailView { display: none; padding: 20px; height: 100vh; flex-direction: column; box-sizing: border-box; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 20; transition: background-color 0.3s; }
+        textarea { width: 100%; flex-grow: 1; border: none; padding: 15px; border-radius: 12px; font-size: 1.1em; resize: none; box-sizing: border-box; background: rgba(255,255,255,0.5); margin-bottom: 15px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.02); }
+        textarea:focus { outline: none; background: rgba(255,255,255,0.8); }
         
+        /* 색상 선택기 */
+        .color-picker { display: flex; gap: 10px; margin-bottom: 15px; justify-content: center; }
+        .color-dot { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+        .color-dot.active { border-color: #333; transform: scale(1.2); }
+
+        /* 버튼 */
         .btn { padding: 10px 18px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; }
         .btn-add { background: var(--primary); color: white; position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; font-size: 35px; box-shadow: 0 4px 15px rgba(66,133,244,0.4); display: flex; align-items: center; justify-content: center; z-index: 15; }
-        .btn-back { background: #f0f0f0; color: #333; }
-        .btn-delete { background: #ffebee; color: #d32f2f; }
+        .btn-back { background: rgba(0,0,0,0.05); color: #333; }
+        .btn-delete { background: #ff4444; color: white; }
         
-        #status { font-size: 0.8em; color: #888; text-align: center; }
+        #status { font-size: 0.8em; color: #666; text-align: center; height: 20px; }
         .hidden { display: none !important; }
         #authSection { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; }
     </style>
@@ -34,15 +44,14 @@
 <body>
 
 <div id="authSection">
-    <h1 style="color:var(--primary); margin-bottom:10px;">☁️ A❤️J Cloud Memo</h1>
-    <p style="color:#666; margin-bottom:30px;">어디서든 열어보는 나만의 메모</p>
-    <button onclick="login()" class="btn" style="background:#4285f4; color:white; padding:15px 40px; font-size:16px;">Google로 시작하기</button>
+    <h1 style="color:var(--primary);">☁️ Cloud Memo</h1>
+    <button onclick="login()" class="btn" style="background:#4285f4; color:white; padding:15px 40px;">Google로 시작하기</button>
 </div>
 
 <div id="mainSection" class="hidden">
     <div class="header">
-        <b id="userInfo" style="font-size: 1.1em;">내 메모</b>
-        <button onclick="logout()" class="btn" style="background:none; color:#999; font-weight:normal;">로그아웃</button>
+        <b id="userInfo">내 메모</b>
+        <button onclick="logout()" class="btn" style="background:none; color:#999;">로그아웃</button>
     </div>
 
     <div id="listView"></div>
@@ -56,6 +65,15 @@
                 <button class="btn" style="background:#34a853; color:white;" onclick="saveMemo()">저장</button>
             </div>
         </div>
+
+        <div class="color-picker" id="colorPicker">
+            <div class="color-dot" style="background: #fff9c4;" data-color="#fff9c4"></div>
+            <div class="color-dot" style="background: #ffecb3;" data-color="#ffecb3"></div>
+            <div class="color-dot" style="background: #e1f5fe;" data-color="#e1f5fe"></div>
+            <div class="color-dot" style="background: #f1f8e9;" data-color="#f1f8e9"></div>
+            <div class="color-dot" style="background: #fce4ec;" data-color="#fce4ec"></div>
+        </div>
+
         <textarea id="memoInput" placeholder="내용을 입력하세요..."></textarea>
         <div id="status">대기 중</div>
     </div>
@@ -66,15 +84,14 @@
     import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getFirestore, collection, doc, setDoc, deleteDoc, query, onSnapshot, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // 1. Firebase 설정
     const firebaseConfig = {
-        apiKey: "AIzaSyDOpuYpod3hPPPBOMSdQkoAYhMRNLBAQy4",
-        authDomain: "pwa-cloud-memo.firebaseapp.com",
-        projectId: "pwa-cloud-memo",
-        storageBucket: "pwa-cloud-memo.firebasestorage.app",
-        messagingSenderId: "156306395907",
-        appId: "1:156306395907:web:fe5fa0332063a407390f36",
-        measurementId: "G-FC15PRWCC4"
+        apiKey: "AIzaSyA68QrJgmmYP0DCcZw2DCFML-lMgow5mzY",
+        authDomain: "aj-web-memo.firebaseapp.com",
+        projectId: "aj-web-memo",
+        storageBucket: "aj-web-memo.firebasestorage.app",
+        messagingSenderId: "38916141470",
+        appId: "1:38916141470:web:18784f885170146105a68f",
+        measurementId: "G-LLHD6FXFVE"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -84,9 +101,11 @@
 
     let currentUserId = null;
     let activeMemoId = null;
+    let activeColor = "#fff9c4";
     let debounceTimer;
+    let detailUnsubscribe = null;
 
-    // 2. PWA 싱글파일 트릭 (Manifest & ServiceWorker)
+    // PWA 설정
     const manifest = {
         name: "Cloud Memo",
         short_name: "메모장",
@@ -96,17 +115,13 @@
         theme_color: "#4285f4",
         icons: [{ src: "https://cdn-icons-png.flaticon.com/512/564/564445.png", sizes: "512x512", type: "image/png" }]
     };
-    const manifestStr = JSON.stringify(manifest);
-    const blob = new Blob([manifestStr], {type: 'application/json'});
+    const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
     document.getElementById('manifest-link').setAttribute('href', URL.createObjectURL(blob));
-
     if ('serviceWorker' in navigator) {
-        const swCode = `self.addEventListener('fetch', (e) => {});`; // 최소 기능을 가진 SW
-        const swBlob = new Blob([swCode], {type: 'text/javascript'});
+        const swBlob = new Blob([`self.addEventListener('fetch', (e) => {});`], {type: 'text/javascript'});
         navigator.serviceWorker.register(URL.createObjectURL(swBlob));
     }
 
-    // 3. 인증 및 로그인 로직
     onAuthStateChanged(auth, (user) => {
         if (user) {
             currentUserId = user.uid;
@@ -122,7 +137,7 @@
     window.login = () => signInWithPopup(auth, provider);
     window.logout = () => signOut(auth);
 
-    // 4. 메모 CRUD 로직
+    // 목록 로드 (실시간)
     function loadMemoList() {
         const q = query(collection(db, "users", currentUserId, "memos"), orderBy("updatedAt", "desc"));
         onSnapshot(q, (snapshot) => {
@@ -132,6 +147,7 @@
                 const data = doc.data();
                 const div = document.createElement('div');
                 div.className = 'post-it';
+                div.style.backgroundColor = data.color || "#fff9c4";
                 div.innerHTML = `
                     <div class="preview">${data.content || '내용 없음'}</div>
                     <div class="date">
@@ -139,7 +155,7 @@
                         ${data.updatedAt?.toDate().toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit', hour12: false}) || '방금'}
                     </div>
                 `;
-                div.onclick = () => openMemo(doc.id, data.content);
+                div.onclick = () => openMemo(doc.id, data.content, data.color);
                 listView.appendChild(div);
             });
         });
@@ -147,57 +163,84 @@
 
     window.createNewMemo = () => {
         activeMemoId = doc(collection(db, "users", currentUserId, "memos")).id;
-        document.getElementById('memoInput').value = '';
-        showDetail();
+        openMemo(activeMemoId, "", "#fff9c4");
     };
 
-    window.openMemo = (id, content) => {
+    window.openMemo = (id, content, color) => {
         activeMemoId = id;
-        document.getElementById('memoInput').value = content;
+        activeColor = color || "#fff9c4";
+        const memoInput = document.getElementById('memoInput');
+        memoInput.value = content;
+        updateUIWithColor(activeColor);
         showDetail();
+
+        if (detailUnsubscribe) detailUnsubscribe();
+        detailUnsubscribe = onSnapshot(doc(db, "users", currentUserId, "memos", id), (snap) => {
+            if (snap.exists() && !memoInput.matches(':focus')) {
+                const data = snap.data();
+                memoInput.value = data.content;
+                activeColor = data.color || "#fff9c4";
+                updateUIWithColor(activeColor);
+                document.getElementById('status').innerText = "☁️ 실시간 동기화됨";
+            }
+        });
     };
+
+    function updateUIWithColor(color) {
+        document.getElementById('detailView').style.backgroundColor = color;
+        document.querySelectorAll('.color-dot').forEach(dot => {
+            dot.classList.toggle('active', dot.dataset.color === color);
+        });
+    }
+
+    // 색상 선택 이벤트
+    document.querySelectorAll('.color-dot').forEach(dot => {
+        dot.onclick = () => {
+            activeColor = dot.dataset.color;
+            updateUIWithColor(activeColor);
+            saveMemo(); // 색상 변경 시 즉시 저장
+        };
+    });
 
     window.saveMemo = async () => {
-        if (!activeMemoId || !currentUserId) return;
+        if (!activeMemoId) return;
         const content = document.getElementById('memoInput').value;
         const statusEl = document.getElementById('status');
         statusEl.innerText = "저장 중...";
         
-        try {
-            await setDoc(doc(db, "users", currentUserId, "memos", activeMemoId), {
-                content: content,
-                updatedAt: serverTimestamp()
-            }, { merge: true });
-            statusEl.innerText = "☁️ 모든 변경사항 저장됨";
-        } catch (e) {
-            statusEl.innerText = "저장 실패";
-        }
+        await setDoc(doc(db, "users", currentUserId, "memos", activeMemoId), {
+            content: content,
+            color: activeColor,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        
+        const now = new Date();
+        statusEl.innerText = `☁️ ${now.toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', hour12:false})} 저장됨`;
     };
 
     window.deleteMemo = async () => {
-        if(confirm("정말 삭제할까요?")) {
+        if(confirm("삭제하시겠습니까?")) {
             await deleteDoc(doc(db, "users", currentUserId, "memos", activeMemoId));
             showList();
         }
     };
 
-    // 5. 디바운싱 (5초 후 자동저장)
     document.getElementById('memoInput').addEventListener('input', () => {
         document.getElementById('status').innerText = "입력 중...";
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(saveMemo, 5000);
     });
 
-    // 6. UI 제어
     window.showDetail = () => {
         document.getElementById('detailView').style.display = 'flex';
         document.getElementById('memoInput').focus();
     };
+
     window.showList = () => {
+        if (detailUnsubscribe) detailUnsubscribe();
         document.getElementById('detailView').style.display = 'none';
         activeMemoId = null;
     };
-
 </script>
 </body>
 </html>
