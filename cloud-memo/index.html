@@ -3,7 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="manifest" href='data:application/manifest+json,{"name":"A❤️J 클라우드 메모","short_name":"A❤️J클라우드메모","start_url":".","display":"standalone","background_color":"#ffffff","theme_color":"#007bff","icons":[{"src":"https://b-o-o-x.github.io/pwa/cloud-memo/cloud-memo-512.png","sizes":"512x512","type":"image/png"}]}'>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#007bff">
+    <link rel="manifest" href='data:application/manifest+json,{
+      "display":"standalone", "start_url":"index.html",
+      "name":"A♥️J 클라우드 메모", "short_name":"A♥️J클라우드 메모",
+      "icons":[{
+        "src":"https://b-o-o-x.github.io/pwa/cloud-memo/cloud-memo-512.png",
+        "sizes":"512x512", "type":"image/png"
+      }]
+    }'/>
     <title>A❤️J 클라우드 메모</title>
     <link id="manifest-link" rel="manifest">
     <style>
@@ -106,23 +119,6 @@
     let activeColor = "#fff9c4";
     let debounceTimer;
     let detailUnsubscribe = null;
-
-    // PWA 설정
-    const manifest = {
-        name: "Cloud Memo",
-        short_name: "메모장",
-        start_url: window.location.href,
-        display: "standalone",
-        background_color: "#ffffff",
-        theme_color: "#4285f4",
-        icons: [{ src: "https://cdn-icons-png.flaticon.com/512/564/564445.png", sizes: "512x512", type: "image/png" }]
-    };
-    const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
-    document.getElementById('manifest-link').setAttribute('href', URL.createObjectURL(blob));
-    if ('serviceWorker' in navigator) {
-        const swBlob = new Blob([`self.addEventListener('fetch', (e) => {});`], {type: 'text/javascript'});
-        navigator.serviceWorker.register(URL.createObjectURL(swBlob));
-    }
 
     onAuthStateChanged(auth, (user) => {
         if (user) {
@@ -271,6 +267,19 @@
         document.getElementById('detailView').style.display = 'none';
         activeMemoId = null;
     };
+</script>
+
+<script>
+// 스크립트 맨 하단에 이것만 사용
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+            console.log("서비스 워커 등록 성공!");
+        }).catch(err => {
+            console.log("등록 실패:", err);
+        });
+    });
+}
 </script>
 </body>
 </html>
