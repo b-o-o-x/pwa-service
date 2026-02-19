@@ -10,36 +10,42 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
         :root { --main-color: #2563eb; --chat-bg: #f3f4f6; }
-        body { font-family: 'Pretendard', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Pretendard', sans-serif; -webkit-tap-highlight-color: transparent; height: 100dvh; display: flex; flex-direction: column; margin: 0; }
         
-        /* 테마 적용 */
         .theme-blue { --main-color: #2563eb; --chat-bg: #f0f2f5; }
         .theme-green { --main-color: #059669; --chat-bg: #ecfdf5; }
         .theme-purple { --main-color: #7c3aed; --chat-bg: #f5f3ff; }
-        .theme-dark { --main-color: #3b82f6; --chat-bg: #1a1a1a; }
+        .theme-dark { --main-color: #1f2937; --chat-bg: #111827; }
 
-        .dark-mode-active { background-color: #111; color: #eee; }
-        .bg-main { background-color: var(--main-color); }
+        .bg-main { background-color: var(--main-color); transition: background 0.3s; }
         .text-main { color: var(--main-color); }
-        .chat-area-bg { background-color: var(--chat-bg); }
+        .chat-area-bg { background-color: var(--chat-bg); transition: background 0.3s; }
 
-        /* 대왕 이모지 */
-        .big-emoji { font-size: 4rem; line-height: 1; padding: 10px 0; }
+        .big-emoji { font-size: 3.5rem; line-height: 1.2; padding: 10px 0; }
         
-        #main-section { display: flex; width: 100vw; height: 100dvh; overflow: hidden; }
+        /* 레이아웃 구조 강제 고정 */
+        #main-section { display: flex; flex: 1; width: 100vw; overflow: hidden; position: relative; }
+        #chat-container { display: flex; flex-direction: column; height: 100%; background: white; }
+        #messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
         @media (max-width: 768px) {
-            #side-bar { width: 100%; position: absolute; left: 0; transition: transform 0.3s; z-index: 20; }
-            #chat-container { width: 100%; position: absolute; left: 0; transform: translateX(100%); transition: transform 0.3s; z-index: 30; }
-            body.chat-open #side-bar { transform: translateX(-100%); }
+            #side-bar { width: 100%; position: absolute; left: 0; height: 100%; transition: 0.3s; z-index: 20; }
+            #chat-container { width: 100%; position: absolute; left: 0; height: 100%; transform: translateX(100%); transition: 0.3s; z-index: 30; }
             body.chat-open #chat-container { transform: translateX(0); }
         }
+
+        /* 이모지 피커 스타일 */
+        #emoji-picker { display: none; position: absolute; bottom: 80px; left: 15px; background: white; border: 1px solid #ddd; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 280px; z-index: 100; padding: 10px; }
+        .emoji-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; max-height: 200px; overflow-y: auto; }
+        .emoji-item { cursor: pointer; font-size: 1.5rem; text-align: center; border-radius: 8px; transition: 0.2s; }
+        .emoji-item:hover { background: #f0f0f0; }
     </style>
 </head>
-<body class="bg-gray-100 overflow-hidden theme-blue">
+<body class="theme-blue">
 
-    <div id="auth-section" class="h-screen flex items-center justify-center p-6 bg-white">
+    <div id="auth-section" class="fixed inset-0 bg-white z-[1000] flex items-center justify-center p-6">
         <div class="text-center">
-            <h1 class="text-3xl font-bold mb-8 text-main">Cloud Chat Pro</h1>
+            <h1 class="text-3xl font-bold mb-8 text-blue-600">Cloud Chat Pro</h1>
             <button id="login-btn" class="flex items-center gap-3 px-8 py-3 border rounded-full hover:bg-gray-50 transition shadow-sm">
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6"> Google 로그인
             </button>
@@ -47,53 +53,58 @@
     </div>
 
     <div id="main-section" class="hidden">
-        <aside id="side-bar" class="w-80 bg-white border-r flex flex-col h-full">
-            <div class="p-4 bg-main text-white flex justify-between items-center">
+        <aside id="side-bar" class="w-80 bg-white border-r flex flex-col h-full shadow-lg">
+            <div class="p-4 bg-main text-white flex justify-between items-center shadow-md">
                 <div class="flex items-center gap-2">
-                    <img id="user-photo" class="w-8 h-8 rounded-full border border-white/20">
+                    <img id="user-photo" class="w-8 h-8 rounded-full border border-white/20 shadow-sm">
                     <span id="user-name" class="font-bold text-sm truncate">사용자</span>
                 </div>
-                <button id="logout-btn" class="opacity-70 hover:opacity-100"><i class="fas fa-sign-out-alt"></i></button>
+                <button id="logout-btn" class="opacity-70 hover:opacity-100 p-2"><i class="fas fa-sign-out-alt"></i></button>
             </div>
-            
             <div id="room-list" class="flex-1 overflow-y-auto p-2 space-y-1 bg-gray-50"></div>
-            
-            <div class="p-4 border-t space-y-2">
-                <input type="text" id="new-room-name" placeholder="방 이름" class="w-full p-2 border rounded-lg text-sm outline-none">
-                <input type="password" id="new-room-pw" placeholder="암호(선택)" class="w-full p-2 border rounded-lg text-sm outline-none">
-                <button id="create-room-btn" class="w-full bg-main text-white py-2 rounded-lg text-sm font-bold shadow-md">+ 방 만들기</button>
+            <div class="p-4 border-t bg-white">
+                <input type="text" id="new-room-name" placeholder="방 이름" class="w-full p-2.5 bg-gray-50 border rounded-xl text-sm outline-none mb-2">
+                <input type="password" id="new-room-pw" placeholder="암호(선택)" class="w-full p-2.5 bg-gray-50 border rounded-xl text-sm outline-none mb-2">
+                <button id="create-room-btn" class="w-full bg-main text-white py-2.5 rounded-xl font-bold text-sm shadow-md transition-transform active:scale-95">+ 방 만들기</button>
             </div>
         </aside>
 
-        <main id="chat-container" class="flex-1 flex flex-col bg-white">
+        <main id="chat-container" class="flex-1">
             <div id="chat-welcome" class="flex-1 flex flex-col items-center justify-center text-gray-300">
-                <i class="fas fa-hand-sparkles text-6xl mb-4 opacity-20"></i>
-                <p>대화를 시작하세요</p>
+                <i class="fas fa-comment-dots text-7xl mb-4 opacity-10"></i>
+                <p>방을 선택하여 대화를 시작하세요</p>
             </div>
 
-            <div id="chat-section" class="hidden flex-1 flex flex-col h-full">
-                <header class="p-4 border-b flex items-center justify-between bg-white z-10">
+            <div id="chat-section" class="hidden flex-1 flex flex-col h-full relative">
+                <header class="p-4 border-b flex items-center justify-between bg-white/80 backdrop-blur-md z-10">
                     <div class="flex items-center gap-3">
-                        <button id="back-btn" class="md:hidden text-gray-400"><i class="fas fa-arrow-left text-xl"></i></button>
-                        <h2 id="current-room-title" class="font-bold">채팅방</h2>
+                        <button id="back-btn" class="md:hidden text-gray-500 hover:bg-gray-100 w-8 h-8 rounded-full transition"><i class="fas fa-arrow-left"></i></button>
+                        <h2 id="current-room-title" class="font-bold text-gray-800">채팅방</h2>
                     </div>
-                    <div class="flex gap-3 text-gray-400">
-                        <div class="flex gap-1 border-r pr-3">
-                            <button onclick="changeTheme('theme-blue')" class="w-4 h-4 rounded-full bg-blue-500"></button>
-                            <button onclick="changeTheme('theme-green')" class="w-4 h-4 rounded-full bg-green-500"></button>
-                            <button onclick="changeTheme('theme-purple')" class="w-4 h-4 rounded-full bg-purple-500"></button>
-                            <button onclick="changeTheme('theme-dark')" class="w-4 h-4 rounded-full bg-gray-800"></button>
-                        </div>
-                        <button id="download-btn"><i class="fas fa-download"></i></button>
+                    <div class="flex items-center gap-3">
+                        <button id="cycle-theme-btn" class="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 border rounded-full hover:bg-gray-50 transition">
+                            <span class="w-2 h-2 rounded-full bg-main"></span> Theme
+                        </button>
+                        <button id="download-btn" class="text-gray-400 hover:text-main p-1.5"><i class="fas fa-download"></i></button>
                     </div>
                 </header>
 
-                <div id="messages" class="flex-1 p-4 overflow-y-auto chat-area-bg space-y-4"></div>
+                <div id="messages" class="flex-1 p-4 chat-area-bg"></div>
 
-                <div class="p-3 bg-white border-t flex items-end gap-2">
-                    <button id="emoji-shortcut" class="p-2 text-gray-400 hover:text-yellow-500 transition"><i class="far fa-smile text-xl"></i></button>
-                    <textarea id="msg-input" rows="1" placeholder="메시지..." class="flex-1 bg-gray-100 border-none rounded-2xl py-2 px-4 text-sm outline-none max-h-32"></textarea>
-                    <button id="send-btn" class="bg-main text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg"><i class="fas fa-paper-plane text-sm"></i></button>
+                <div id="emoji-picker">
+                    <div class="emoji-grid" id="emoji-grid"></div>
+                </div>
+
+                <div class="p-3 bg-white border-t sm:p-4">
+                    <div class="flex items-end gap-2 max-w-5xl mx-auto">
+                        <button id="emoji-btn" class="p-2 text-gray-400 hover:text-yellow-500 transition"><i class="far fa-smile text-2xl"></i></button>
+                        <div class="flex-1 bg-gray-100 rounded-2xl flex items-end px-3">
+                            <textarea id="msg-input" rows="1" placeholder="메시지 입력..." class="flex-1 bg-transparent border-none py-3 text-[15px] outline-none resize-none max-h-32"></textarea>
+                        </div>
+                        <button id="send-btn" class="bg-main text-white w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-90 mb-0.5">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </main>
@@ -122,36 +133,55 @@
         let currentRoomId = null;
         let unsubscribeMessages = null;
 
-        // --- PWA 서비스 워커 등록 ---
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
-        }
-
-        // --- 테마 관리 ---
-        window.changeTheme = (themeName) => {
-            document.body.className = `overflow-hidden ${themeName}`;
-            localStorage.setItem('user-theme', themeName);
+        // --- 테마 순환 시스템 ---
+        const themes = ['theme-blue', 'theme-green', 'theme-purple', 'theme-dark'];
+        document.getElementById('cycle-theme-btn').onclick = () => {
+            if (!currentRoomId) return;
+            const currentTheme = document.body.className;
+            let nextIndex = (themes.indexOf(currentTheme) + 1) % themes.length;
+            const nextTheme = themes[nextIndex];
+            
+            document.body.className = nextTheme;
+            localStorage.setItem(`theme_${currentRoomId}`, nextTheme);
         };
-        const savedTheme = localStorage.getItem('user-theme') || 'theme-blue';
-        changeTheme(savedTheme);
+
+        // --- 이모지 피커 ---
+        const emojis = ["😀","😃","😄","😁","😆","😅","😂","🤣","☺️","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩","🥳","😏","😒","😞","😔","😟","😕","🙁","☹️","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🤭","🤫","🤥","😶","😐","😑","😬","🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪","😵","🤐","🥴","🤢","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👿","👹","👺","🤡","💩","👻","💀","☠️","👽","👾","🤖","🎃","😺","😸","😹","😻","😼","😽","🙀","😿","😾"];
+        const grid = document.getElementById('emoji-grid');
+        emojis.forEach(e => {
+            const btn = document.createElement('div');
+            btn.className = 'emoji-item p-1';
+            btn.innerText = e;
+            btn.onclick = () => {
+                const input = document.getElementById('msg-input');
+                const start = input.selectionStart;
+                const end = input.selectionEnd;
+                input.value = input.value.substring(0, start) + e + input.value.substring(end);
+                input.focus();
+                input.selectionStart = input.selectionEnd = start + e.length;
+                document.getElementById('emoji-picker').style.display = 'none';
+            };
+            grid.appendChild(btn);
+        });
+        document.getElementById('emoji-btn').onclick = (e) => {
+            e.stopPropagation();
+            const picker = document.getElementById('emoji-picker');
+            picker.style.display = picker.style.display === 'block' ? 'none' : 'block';
+        };
+        document.addEventListener('click', () => document.getElementById('emoji-picker').style.display = 'none');
 
         // --- 스와이프 제어 ---
         let touchStartX = 0;
         document.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX);
         document.addEventListener('touchend', e => {
+            if (window.innerWidth > 768) return;
             const touchEndX = e.changedTouches[0].clientX;
             if (touchEndX - touchStartX > 100 && document.body.classList.contains('chat-open')) {
                 document.body.classList.remove('chat-open');
             }
         });
 
-        // --- 이모지 감지 (단일 이모지 여부 확인) ---
-        function isOnlyEmoji(str) {
-            const emojiRegex = /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])$/;
-            return emojiRegex.test(str.trim());
-        }
-
-        // --- 인증 & 방 목록 ---
+        // --- 인증 관리 ---
         onAuthStateChanged(auth, user => {
             if (user) {
                 currentUser = user;
@@ -175,16 +205,12 @@
                 list.innerHTML = '';
                 for (const docSnap of snapshot.docs) {
                     const room = docSnap.data();
-                    // 내 입장 여부 확인 (자물쇠 아이콘 결정)
                     const memberSnap = await getDoc(doc(db, `rooms/${docSnap.id}/members`, currentUser.uid));
                     const isJoined = memberSnap.exists() || room.owner === currentUser.uid;
                     
                     const div = document.createElement('div');
-                    div.className = `p-4 m-1 rounded-2xl cursor-pointer flex justify-between items-center transition ${currentRoomId === docSnap.id ? 'bg-main text-white shadow-lg' : 'bg-white border text-gray-700'}`;
-                    div.innerHTML = `
-                        <div class="text-sm font-semibold truncate">${room.name}</div>
-                        <i class="fas ${isJoined ? 'fa-lock-open text-green-400' : (room.password ? 'fa-lock text-gray-300' : 'fa-hashtag opacity-20')} text-xs"></i>
-                    `;
+                    div.className = `p-4 m-1 rounded-2xl cursor-pointer flex justify-between items-center transition ${currentRoomId === docSnap.id ? 'bg-main text-white' : 'bg-white border text-gray-700'}`;
+                    div.innerHTML = `<div><div class="text-sm font-bold truncate">${room.name}</div></div><i class="fas ${isJoined ? 'fa-lock-open' : (room.password ? 'fa-lock opacity-30' : 'fa-hashtag opacity-10')} text-[10px]"></i>`;
                     div.onclick = () => enterRoom(docSnap.id, room);
                     list.appendChild(div);
                 }
@@ -196,12 +222,17 @@
             const memberSnap = await getDoc(memberRef);
 
             if (!memberSnap.exists() && room.owner !== currentUser.uid) {
-                if (room.password && prompt("비밀번호:") !== room.password) return alert("틀렸습니다.");
+                if (room.password && prompt("암호:") !== room.password) return alert("암호 오류");
                 await setDoc(memberRef, { joinedAt: serverTimestamp() });
                 await addDoc(collection(db, `rooms/${id}/messages`), { type: 'system', text: `${currentUser.displayName}님이 입장하였습니다.`, createdAt: serverTimestamp() });
             }
 
             currentRoomId = id;
+            
+            // 방별 테마 불러오기
+            const roomTheme = localStorage.getItem(`theme_${id}`) || 'theme-blue';
+            document.body.className = roomTheme;
+
             document.body.classList.add('chat-open');
             document.getElementById('chat-welcome').classList.add('hidden');
             document.getElementById('chat-section').classList.remove('hidden');
@@ -219,17 +250,18 @@
                 snapshot.forEach(docSnap => {
                     const msg = docSnap.data();
                     const isMe = msg.uid === currentUser.uid;
-                    const isEmoji = msg.text && isOnlyEmoji(msg.text);
+                    const emojiRegex = /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])$/;
+                    const isEmoji = emojiRegex.test(msg.text?.trim());
 
                     if (msg.type === 'system') {
-                        msgDiv.innerHTML += `<div class="text-center text-[10px] text-gray-400 my-4 uppercase tracking-widest">${msg.text}</div>`;
+                        msgDiv.innerHTML += `<div class="text-center text-[10px] text-gray-400 my-4 uppercase tracking-tighter">${msg.text}</div>`;
                     } else {
                         const html = `
                             <div class="flex ${isMe ? 'flex-row-reverse' : 'flex-row'} items-start gap-2 mb-2">
                                 <img src="${msg.userPhoto}" class="w-8 h-8 rounded-full border shadow-sm">
-                                <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[80%]">
+                                <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[85%]">
                                     <span class="text-[9px] text-gray-400 mb-0.5 px-1">${msg.userName}</span>
-                                    <div class="${isEmoji ? 'big-emoji' : `px-4 py-2 rounded-2xl text-sm shadow-sm ${isMe ? 'bg-main text-white rounded-tr-none' : 'bg-white text-gray-800 border rounded-tl-none'}`}">
+                                    <div class="${isEmoji ? 'big-emoji' : `px-4 py-2.5 rounded-2xl text-[14.5px] shadow-sm ${isMe ? 'bg-main text-white rounded-tr-none' : 'bg-white text-gray-800 border rounded-tl-none'}`}">
                                         ${msg.text.replace(/\n/g, '<br>')}
                                     </div>
                                 </div>
@@ -249,13 +281,12 @@
                 text, uid: currentUser.uid, userName: currentUser.displayName, userPhoto: currentUser.photoURL, createdAt: serverTimestamp()
             });
             input.value = '';
+            input.style.height = 'auto';
         };
 
         document.getElementById('send-btn').onclick = sendMessage;
         document.getElementById('msg-input').onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
         document.getElementById('back-btn').onclick = () => document.body.classList.remove('chat-open');
-        document.getElementById('emoji-shortcut').onclick = () => alert("Windows: Win + . / Mac: Cmd + Ctrl + Space");
-
     </script>
 </body>
 </html>
