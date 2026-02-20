@@ -367,119 +367,102 @@
         const enterRoom = async (id, room) => {
             if (currentRoomId === id) return;
         
-            // 1. 참여 여부 확인 (본인이 만든 방이거나 이미 멤버인 경우 패스)
             const memberRef = doc(db, `rooms/${id}/members`, currentUser.uid);
-            const memberSnap = await getDoc(memberRef);
-            const isJoined = memberSnap.exists() || room.owner === currentUser.uid;
+            let memberSnap = await getDoc(memberRef);
+            const isOwner = room.owner === currentUser.uid;
         
-            // 2. 비밀번호가 걸려있고 아직 참여하지 않은 방이라면?
-            if (room.password && !isJoined) {
-                const inputPw = prompt("비밀번호가 걸려있는 방입니다. 암호를 입력하세요:");
-                if (inputPw === null) return; // 취소 버튼 클릭 시 종료
-                
-                if (inputPw !== room.password) {
-                    alert("비밀번호가 일치하지 않습니다.");
-                    return;
-                }
-                
-                // 비밀번호가 맞다면 멤버로 등록 (다음 입장 시 안 물어보게 함)
-                await setDoc(memberRef, { joinedAt: serverTimestamp() });
+            // 1. 암호 확인 및 멤버 등록
+            if (room.password && !memberSnap.exists() && !isOwner) {
+                const inputPw = prompt("비밀번호를 입력하세요:");
+                if (inputPw === null) return;
+                if (inputPw !== room.password) return alert("비밀번호가 틀렸습니다.");
             }
         
-            // 3. 실제 입장 처리 (기존 로직)
-            isInitialLoad = true; 
-            lastDateStr = null; 
-            currentRoomId = id;
-            
-            const box = document.getElementById('messages');
-            box.innerHTML = ''; 
+            // 2. 처음 입장하는 경우에만 입장 메시지 전송 및 입장 시간 기록
+            if (!memberSnap.exists() && !isOwner) {
+                const now = serverTimestamp();
+                await setDoc(memberRef, { joinedAt: now });
+                await addDoc(collection(db, `rooms/${id}/messages`), {
+                    text: `📢 ${currentUser.displayName}님이 입장하셨습니다.`,
+                    type: "system",
+                    createdAt: now
+                });
+                memberSnap = await getDoc(memberRef); // 갱신
+            }
         
+            // 3. 입장 시간 저장 (본인이 만든 방이면 방 생성 시간 기준)
+            const joinTime = isOwner ? room.createdAt : memberSnap.data().joinedAt;
+            
+            currentRoomId = id;
+            isInitialLoad = true;
             document.body.classList.add('chat-open');
-            document.getElementById('chat-welcome').classList.add('hidden');
             document.getElementById('chat-section').classList.remove('hidden');
+            document.getElementById('chat-welcome').classList.add('hidden');
             document.getElementById('current-room-title').innerText = room.name;
         
-            const badge = document.getElementById(`badge-${id}`);
-            if(badge) { badge.innerText = "0"; badge.classList.add('hidden'); }
+            // 방장 여부에 따른 버튼 텍스트 변경
+            const leaveBtn = document.getElementById('leave-room-btn');
+            leaveBtn.innerText = isOwner ? "방 제거" : "나가기";
+            leaveBtn.className = isOwner ? "text-[10px] font-bold px-2 py-1 border rounded-lg text-white bg-red-500" : "text-[10px] font-bold px-2 py-1 border rounded-lg text-red-500 bg-red-50";
         
-            loadMessages(id);
+            loadMessages(id, joinTime);
         };
         
-        const loadMessages = (rid) => {
+        const loadMessages = (rid, joinTime) => {
             if (unsubscribeMessages) unsubscribeMessages();
         
-            // 1. 가장 안정적인 쿼리: 시간순 정렬 (데이터가 많아지면 나중에 limit 추가)
+            // 쿼리: 입장 시간(joinTime)보다 큰(이후인) 메시지만 가져오기
             const q = query(
-                collection(db, `rooms/${rid}/messages`), 
+                collection(db, `rooms/${rid}/messages`),
+                where("createdAt", ">=", joinTime), 
                 orderBy("createdAt", "asc")
             );
         
             unsubscribeMessages = onSnapshot(q, (snap) => {
                 const box = document.getElementById('messages');
-                
-                // 초기 로드 시에만 비우기 혹은 매번 비우기 (중복 방지)
                 box.innerHTML = '';
                 lastDateStr = null;
         
                 if (snap.empty) {
-                    box.innerHTML = '<div class="text-center text-gray-400 text-xs mt-10">이전 대화 내용이 없습니다.</div>';
-                    return;
+                    box.innerHTML = '<div class="text-center text-gray-400 text-xs mt-10">새로운 대화를 시작해보세요!</div>';
                 }
         
                 snap.docs.forEach(docSnap => {
-                    const m = docSnap.data();
-                    
-                    // [수정] createdAt이 없으면 '전송 중'인 상태입니다. 
-                    // 아예 return 하지 말고, renderMsg 내부에서 처리하게 둡니다.
-                    let dateObj;
-                    if (m.createdAt) {
-                        dateObj = m.createdAt.toDate();
-                        const dStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`;
-        
-                        // 날짜 구분선
-                        if (lastDateStr !== dStr) {
-                            const divider = document.createElement('div');
-                            divider.className = 'date-divider';
-                            divider.innerText = dStr;
-                            box.appendChild(divider);
-                            lastDateStr = dStr;
-                        }
-                    }
-        
-                    // 메시지 렌더링
-                    renderMsg(m, box);
+                    renderMsg(docSnap.data(), box);
                 });
-        
-                // 스크롤 하단 이동
                 box.scrollTop = box.scrollHeight;
                 isInitialLoad = false;
-            }, (error) => {
-                console.error("Snapshot error:", error);
-                // 만약 여기서 'The query requires an index' 에러가 뜨면 콘솔의 링크를 클릭해 색인을 만들어야 합니다.
+            }, (err) => {
+                // 방이 삭제되었을 때 처리
+                if (currentRoomId === rid) {
+                    alert("방이 존재하지 않거나 삭제되었습니다.");
+                    exitChatUI();
+                }
             });
         };
 
         const renderMsg = (m, box) => {
+            if (m.type === "system") {
+                box.insertAdjacentHTML('beforeend', `<div class="text-center text-[11px] text-gray-400 my-4">${m.text}</div>`);
+                return;
+            }
+        
             const isMe = m.uid === currentUser.uid;
-            
-            // 시간이 없으면(전송 중) "..."으로 표시
-            const tStr = m.createdAt 
-                ? new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: 'numeric', hour12: true }).format(m.createdAt.toDate()) 
-                : "...";
-                
+            // 시간 글씨 크기를 text-[8px]에서 text-[10px]로 키움
+            const tStr = m.createdAt ? new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: 'numeric' }).format(m.createdAt.toDate()) : "...";
             const isEmoji = /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])$/.test(m.text?.trim());
         
             box.insertAdjacentHTML('beforeend', `
                 <div class="flex ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end gap-1 mb-4">
                     <img src="${m.userPhoto}" onclick="openProfile('${m.uid}', '${m.userName}', '${m.userPhoto}')" 
-                         class="w-8 h-8 rounded-full border mb-4 flex-shrink-0 cursor-pointer active:scale-90 transition shadow-sm">
+                         class="w-8 h-8 rounded-full border mb-4 flex-shrink-0 cursor-pointer shadow-sm">
                     <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]">
                         <span class="text-[9px] text-gray-400 px-1 mb-0.5">${m.userName}</span>
                         <div class="${isEmoji ? 'big-emoji' : `px-3 py-2 rounded-2xl text-[14px] shadow-sm ${isMe ? 'bg-main text-white rounded-tr-none' : 'bg-white text-gray-800 border rounded-tl-none'}`}">
                             ${m.text.replace(/\n/g, '<br>')}
                         </div>
                     </div>
-                    <span class="text-[8px] text-gray-400 pb-1 flex-shrink-0">${tStr}</span>
+                    <span class="text-[10px] text-gray-400 pb-1 flex-shrink-0 font-medium">${tStr}</span>
                 </div>`);
         };
 
@@ -548,16 +531,30 @@
         document.getElementById('back-btn').onclick = () => { document.body.classList.remove('chat-open'); currentRoomId = null; };
         
         document.getElementById('leave-room-btn').onclick = async () => {
-            if (!confirm("정말 나가시겠습니까?")) return;
+            if (!currentRoomId) return;
+            
             const roomRef = doc(db, "rooms", currentRoomId);
             const roomSnap = await getDoc(roomRef);
-            if (roomSnap.data().owner === currentUser.uid) {
-                await deleteDoc(roomRef);
+            const isOwner = roomSnap.data().owner === currentUser.uid;
+        
+            if (isOwner) {
+                if (!confirm("방을 삭제하시겠습니까? 모든 대화 내용이 사라집니다.")) return;
+                // 실제 운영 시에는 서브컬렉션(messages)도 지우는 Cloud Functions를 쓰거나 
+                // 그냥 방 문서만 지워도 리스너에서 에러가 나며 튕겨나갑니다.
+                await deleteDoc(roomRef); 
             } else {
+                if (!confirm("채팅방에서 나가시겠습니까?")) return;
                 await deleteDoc(doc(db, `rooms/${currentRoomId}/members`, currentUser.uid));
             }
+            exitChatUI();
+        };
+        
+        const exitChatUI = () => {
             document.body.classList.remove('chat-open');
+            document.getElementById('chat-section').classList.add('hidden');
+            document.getElementById('chat-welcome').classList.remove('hidden');
             currentRoomId = null;
+            if (unsubscribeMessages) unsubscribeMessages();
         };
 
         const emojis = ["😀","😃","😄","😁","😆","😅","😂","🤣","😍","🥰","😘","😋","😛","😜","🤪","🤨","🧐","😎","🥳","😏","😒","😞","😔","😟","😕","🙁","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🤭","🤫","🤥","😶","😐","😑","😬","🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪","😵","🤐","🥴","🤢","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👿","👹","👺","🤡","💩","Ghosts","💀","☠️","👽","👾","🤖","🎃"];
