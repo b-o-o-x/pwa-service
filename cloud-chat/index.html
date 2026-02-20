@@ -180,6 +180,7 @@
         let currentUser = null, currentRoomId = null, unsubscribeMessages = null, isInitialLoad = true, lastDateStr = null;
         let peer = null, localStream = null, currentCall = null, selectedUser = null;
         const activeUnreadListeners = {}; 
+        const roomThemes = {}; // [추가] 방별 테마 저장소
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(() => console.log("SW Registered"));
@@ -231,7 +232,7 @@
             endCallUI();
         };
 
-        // --- 프로필 팝업 로직 ---
+        // --- 프로필 팝업 ---
         window.openProfile = (uid, name, photo) => {
             if (uid === currentUser.uid) return; 
             selectedUser = { uid, name, photo };
@@ -247,67 +248,44 @@
         document.getElementById('voice-call-btn').onclick = async () => {
             const targetUser = selectedUser; 
             closeProfile();
-            
             await addDoc(collection(db, `rooms/${currentRoomId}/messages`), {
                 text: "📞 보이스톡 연결을 시도 중입니다...",
-                uid: currentUser.uid,
-                userName: currentUser.displayName,
-                userPhoto: currentUser.photoURL,
-                createdAt: serverTimestamp()
+                uid: currentUser.uid, userName: currentUser.displayName, userPhoto: currentUser.photoURL, createdAt: serverTimestamp()
             });
-        
             showCallOverlay(targetUser.name, targetUser.photo, false);
-        
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true } });
                 localStream = stream;
                 if (peer && !peer.destroyed) {
                     const call = peer.call(targetUser.uid, localStream);
                     if (call) handleCallStream(call);
                 }
-            } catch (err) {
-                alert("마이크를 사용할 수 없습니다.");
-                endCallUI();
-            }
+            } catch (err) { alert("마이크 사용 불가"); endCallUI(); }
         };
 
         // --- 알림 로직 ---
         const triggerNoti = (msg, rid, roomName) => {
             if (msg.uid === currentUser.uid || currentRoomId === rid) return;
-
             const sound = document.getElementById('noti-sound');
-            sound.currentTime = 0;
-            sound.play().catch(() => {});
-
+            sound.currentTime = 0; sound.play().catch(() => {});
             const toast = document.getElementById('notification-toast');
             document.getElementById('noti-msg').innerText = `[${roomName}] ${msg.userName}: ${msg.text}`;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 3000);
-
             if (Notification.permission === "granted" && document.hidden) {
                 navigator.serviceWorker.ready.then(reg => {
-                    reg.showNotification(`[${roomName}] ${msg.userName}`, {
-                        body: msg.text,
-                        icon: msg.userPhoto,
-                        tag: rid 
-                    });
+                    reg.showNotification(`[${roomName}] ${msg.userName}`, { body: msg.text, icon: msg.userPhoto, tag: rid });
                 });
             }
         };
 
-        // [복구/수정] 방 목록 및 자물쇠 실시간 반영
         const loadRooms = () => {
             const q = query(collection(db, "rooms"), orderBy("createdAt", "desc"));
             onSnapshot(q, (snap) => {
                 const list = document.getElementById('room-list');
                 list.innerHTML = '';
-                
                 snap.docs.forEach(async (d) => {
                     const room = d.data(), rid = d.id;
-                    
-                    // 참여 여부 확인
                     const memberRef = doc(db, `rooms/${rid}/members`, currentUser.uid);
                     const memberSnap = await getDoc(memberRef);
                     const isJoined = memberSnap.exists() || room.owner === currentUser.uid;
@@ -318,23 +296,14 @@
                     
                     let lockIcon = "";
                     if (room.password) {
-                        // [수정] 자물쇠 아이콘 실시간 반영을 위해 class 추가
                         lockIcon = `<i class="fas fa-${isJoined ? 'lock-open' : 'lock'} text-[10px] ml-2 ${isJoined ? 'text-blue-400' : 'opacity-40'} lock-status-icon"></i>`;
                     }
         
-                    div.innerHTML = `
-                        <div class="flex-1 flex items-center overflow-hidden">
-                            <span class="text-sm font-bold truncate">${room.name}</span>
-                            ${lockIcon}
-                        </div>
-                        <span id="badge-${rid}" class="unread-badge hidden">0</span>`;
-                    
+                    div.innerHTML = `<div class="flex-1 flex items-center overflow-hidden"><span class="text-sm font-bold truncate">${room.name}</span>${lockIcon}</div><span id="badge-${rid}" class="unread-badge hidden">0</span>`;
                     div.onclick = () => enterRoom(rid, room);
                     list.appendChild(div);
-        
                     if (isJoined) setupGlobalListener(rid, room.name);
                 });
-                
                 setTimeout(() => { isInitialLoad = false; }, 2000);
             });
         };
@@ -357,7 +326,7 @@
         };
         
         const updateBadge = (rid) => {
-            const badge = document.getElementById(`badge-${rid}`);
+            const badge = document.getElementById('badge-' + rid);
             if (!badge) return;
             let count = parseInt(badge.innerText) || 0;
             badge.innerText = count + 1;
@@ -367,43 +336,33 @@
         // --- 방 입장 로직 ---
         const enterRoom = async (id, room) => {
             if (currentRoomId === id) return;
-
             const memberRef = doc(db, `rooms/${id}/members`, currentUser.uid);
-            const memberSnap = await getDoc(memberRef);
+            let memberSnap = await getDoc(memberRef);
             const isOwner = room.owner === currentUser.uid;
         
             if (room.password && !memberSnap.exists() && !isOwner) {
-                const inputPw = prompt("비밀번호를 입력하세요:");
+                const inputPw = prompt("비밀번호 입력:");
                 if (inputPw === null) return;
-                if (inputPw !== room.password) return alert("비밀번호가 틀렸습니다.");
-                
+                if (inputPw !== room.password) return alert("비번 틀림");
                 await setDoc(memberRef, { joinedAt: serverTimestamp() });
-                // [추가] 입장 성공 시 UI의 자물쇠 즉시 변경
-                const lockIcon = document.querySelector(`#room-${id} .lock-status-icon`);
-                if(lockIcon) {
-                    lockIcon.className = "fas fa-lock-open text-[10px] ml-2 text-blue-400 lock-status-icon";
-                }
+                const icon = document.querySelector(`#room-${id} .lock-status-icon`);
+                if(icon) icon.className = "fas fa-lock-open text-[10px] ml-2 text-blue-400 lock-status-icon";
+                setupGlobalListener(id, room.name); // [수정] 입장 즉시 리스너 등록
             }
             
             if (!memberSnap.exists() && !isOwner) {
                 const now = serverTimestamp();
                 await setDoc(memberRef, { joinedAt: now });
                 await addDoc(collection(db, `rooms/${id}/messages`), {
-                    text: `📢 ${currentUser.displayName}님이 입장하셨습니다.`,
-                    type: "system",
-                    createdAt: now
+                    text: `📢 ${currentUser.displayName}님이 입장하셨습니다.`, type: "system", createdAt: now
                 });
+                setupGlobalListener(id, room.name); // [수정] 신규 입장 시 리스너 등록
             }
         
-            const finalMemberSnap = await getDoc(memberRef);
-            const joinTime = isOwner ? room.createdAt : finalMemberSnap.data().joinedAt;
-            
-            // [수정] 입장 시 뱃지 초기화 확실히 수행
-            const badge = document.getElementById(`badge-${id}`);
-            if (badge) {
-                badge.innerText = "0";
-                badge.classList.add('hidden');
-            }
+            memberSnap = await getDoc(memberRef);
+            const joinTime = isOwner ? room.createdAt : memberSnap.data().joinedAt;
+            const badge = document.getElementById('badge-' + id);
+            if (badge) { badge.innerText = "0"; badge.classList.add('hidden'); }
         
             currentRoomId = id;
             isInitialLoad = true;
@@ -411,82 +370,74 @@
             document.getElementById('chat-section').classList.remove('hidden');
             document.getElementById('chat-welcome').classList.add('hidden');
             document.getElementById('current-room-title').innerText = room.name;
+
+            // [추가] 방별 테마 적용
+            const savedTheme = roomThemes[id] || 'theme-blue';
+            applyTheme(savedTheme);
         
             const leaveBtn = document.getElementById('leave-room-btn');
             leaveBtn.innerText = isOwner ? "방 제거" : "나가기";
             leaveBtn.className = isOwner ? "text-[10px] font-bold px-2 py-1 border rounded-lg text-white bg-red-500" : "text-[10px] font-bold px-2 py-1 border rounded-lg text-red-500 bg-red-50";
-        
             loadMessages(id, joinTime);
         };
         
         const loadMessages = (rid, joinTime) => {
             if (unsubscribeMessages) unsubscribeMessages();
             const q = query(collection(db, `rooms/${rid}/messages`), where("createdAt", ">=", joinTime), orderBy("createdAt", "asc"));
-        
             unsubscribeMessages = onSnapshot(q, (snap) => {
                 const box = document.getElementById('messages');
-                box.innerHTML = '';
-                lastDateStr = null; // 날짜 구분선 초기화 필수
-        
-                if (snap.empty) {
-                    box.innerHTML = '<div class="text-center text-gray-400 text-xs mt-10">새로운 대화를 시작해보세요!</div>';
-                }
-        
-                snap.docs.forEach(docSnap => {
-                    renderMsg(docSnap.data(), box);
-                });
+                box.innerHTML = ''; lastDateStr = null;
+                if (snap.empty) box.innerHTML = '<div class="text-center text-gray-400 text-xs mt-10">대화를 시작하세요!</div>';
+                snap.docs.forEach(docSnap => renderMsg(docSnap.data(), box));
                 box.scrollTop = box.scrollHeight;
                 isInitialLoad = false;
-            }, (err) => {
-                if (currentRoomId === rid) { alert("방이 존재하지 않거나 삭제되었습니다."); exitChatUI(); }
-            });
+            }, (err) => { if (currentRoomId === rid) { alert("방 삭제됨"); exitChatUI(); } });
         };
 
         const renderMsg = (m, box) => {
-            // [복구] 날짜 구분선 로직
             if (m.createdAt) {
-                const dateObj = m.createdAt.toDate();
-                const dateStr = dateObj.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
-                
-                if (lastDateStr !== dateStr) {
-                    box.insertAdjacentHTML('beforeend', `<div class="date-divider">${dateStr}</div>`);
-                    lastDateStr = dateStr;
-                }
+                const d = m.createdAt.toDate();
+                const s = d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+                if (lastDateStr !== s) { box.insertAdjacentHTML('beforeend', `<div class="date-divider">${s}</div>`); lastDateStr = s; }
             }
-        
             if (m.type === "system") {
                 box.insertAdjacentHTML('beforeend', `<div class="text-center text-[11px] text-gray-400 my-4">${m.text}</div>`);
                 return;
             }
-        
             const isMe = m.uid === currentUser.uid;
-            const tStr = m.createdAt ? new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: 'numeric' }).format(m.createdAt.toDate()) : "...";
-            const isEmoji = /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])$/.test(m.text?.trim());
-        
+            const t = m.createdAt ? new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: 'numeric' }).format(m.createdAt.toDate()) : "...";
+            const isE = /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])$/.test(m.text?.trim());
             box.insertAdjacentHTML('beforeend', `
                 <div class="flex ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end gap-1 mb-4">
-                    <img src="${m.userPhoto}" onclick="openProfile('${m.uid}', '${m.userName}', '${m.userPhoto}')" 
-                         class="w-8 h-8 rounded-full border mb-4 flex-shrink-0 cursor-pointer shadow-sm">
+                    <img src="${m.userPhoto}" onclick="openProfile('${m.uid}', '${m.userName}', '${m.userPhoto}')" class="w-8 h-8 rounded-full border mb-4 flex-shrink-0 cursor-pointer shadow-sm">
                     <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]">
                         <span class="text-[9px] text-gray-400 px-1 mb-0.5">${m.userName}</span>
-                        <div class="${isEmoji ? 'big-emoji' : `px-3 py-2 rounded-2xl text-[14px] shadow-sm ${isMe ? 'bg-main text-white rounded-tr-none' : 'bg-white text-gray-800 border rounded-tl-none'}`}">
+                        <div class="${isE ? 'big-emoji' : `px-3 py-2 rounded-2xl text-[14px] shadow-sm ${isMe ? 'bg-main text-white rounded-tr-none' : 'bg-white text-gray-800 border rounded-tl-none'}`}">
                             ${m.text.replace(/\n/g, '<br>')}
                         </div>
                     </div>
-                    <span class="text-[10px] text-gray-400 pb-1 flex-shrink-0 font-medium">${tStr}</span>
+                    <span class="text-[10px] text-gray-400 pb-1 flex-shrink-0 font-medium">${t}</span>
                 </div>`);
         };
 
-        // --- 기타 UI 로직 ---
-        let startX = 0;
-        const chatCont = document.getElementById('chat-container');
-        chatCont.addEventListener('touchstart', e => startX = e.touches[0].clientX, {passive:true});
-        chatCont.addEventListener('touchend', e => {
-            if (e.changedTouches[0].clientX - startX > 100 && document.body.classList.contains('chat-open')) {
-                document.body.classList.remove('chat-open');
-                currentRoomId = null;
+        const exitChatUI = (ridToLock = null) => { // [수정] 나가는 방 잠금 처리 추가
+            if (ridToLock) {
+                const icon = document.querySelector(`#room-${ridToLock} .lock-status-icon`);
+                if(icon) icon.className = "fas fa-lock text-[10px] ml-2 opacity-40 lock-status-icon";
             }
-        }, {passive:true});
+            document.body.classList.remove('chat-open');
+            document.getElementById('chat-section').classList.add('hidden');
+            document.getElementById('chat-welcome').classList.remove('hidden');
+            currentRoomId = null;
+            if (unsubscribeMessages) unsubscribeMessages();
+        };
+
+        // --- 테마 적용 함수 [추가] ---
+        const applyTheme = (themeClass) => {
+            const themes = ['theme-blue', 'theme-green', 'theme-purple', 'theme-dark'];
+            themes.forEach(t => document.body.classList.remove(t));
+            document.body.classList.add(themeClass);
+        };
 
         onAuthStateChanged(auth, u => {
             if (u) {
@@ -495,12 +446,8 @@
                 document.getElementById('main-section').classList.remove('hidden');
                 document.getElementById('user-name').innerText = u.displayName;
                 document.getElementById('user-photo').src = u.photoURL;
-                initPeer(u.uid);
-                checkNotiPermission();
-                loadRooms();
-            } else {
-                document.getElementById('auth-section').classList.remove('hidden');
-            }
+                initPeer(u.uid); checkNotiPermission(); loadRooms();
+            } else { document.getElementById('auth-section').classList.remove('hidden'); }
         });
 
         document.getElementById('login-btn').onclick = () => signInWithPopup(auth, provider);
@@ -510,47 +457,38 @@
             const n = document.getElementById('new-room-name').value.trim();
             const p = document.getElementById('new-room-pw').value;
             if (!n) return;
-            await addDoc(collection(db, "rooms"), { name: n, password: p, owner: currentUser.uid, createdAt: serverTimestamp() });
-            document.getElementById('new-room-name').value = '';
-            document.getElementById('new-room-pw').value = '';
+            const docRef = await addDoc(collection(db, "rooms"), { name: n, password: p, owner: currentUser.uid, createdAt: serverTimestamp() });
+            setupGlobalListener(docRef.id, n); // [수정] 방 생성 즉시 리스너 등록
+            document.getElementById('new-room-name').value = ''; document.getElementById('new-room-pw').value = '';
         };
 
         const send = async () => {
             const i = document.getElementById('msg-input'), t = i.value.trim();
             if (!t || !currentRoomId) return;
             i.value = ''; i.style.height = 'auto';
-            try {
-                await addDoc(collection(db, `rooms/${currentRoomId}/messages`), {
-                    text: t, uid: currentUser.uid, userName: currentUser.displayName, userPhoto: currentUser.photoURL, createdAt: serverTimestamp()
-                });
-            } catch (e) { alert("메시지 전송 실패"); }
+            try { await addDoc(collection(db, `rooms/${currentRoomId}/messages`), { text: t, uid: currentUser.uid, userName: currentUser.displayName, userPhoto: currentUser.photoURL, createdAt: serverTimestamp() });
+            } catch (e) { alert("전송 실패"); }
         };
 
         document.getElementById('send-btn').onclick = send;
         document.getElementById('msg-input').onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
-        document.getElementById('back-btn').onclick = () => { document.body.classList.remove('chat-open'); currentRoomId = null; };
+        document.getElementById('back-btn').onclick = () => exitChatUI();
         
         document.getElementById('leave-room-btn').onclick = async () => {
-            if (!currentRoomId) return;
-            const roomRef = doc(db, "rooms", currentRoomId);
+            const rid = currentRoomId;
+            const roomRef = doc(db, "rooms", rid);
             const roomSnap = await getDoc(roomRef);
             const isOwner = roomSnap.data().owner === currentUser.uid;
             if (isOwner) {
-                if (!confirm("방을 삭제하시겠습니까?")) return;
-                await deleteDoc(roomRef); 
+                if (!confirm("방 삭제?")) return;
+                await deleteDoc(roomRef);
+                exitChatUI();
             } else {
-                if (!confirm("채팅방에서 나가시겠습니까?")) return;
-                await deleteDoc(doc(db, `rooms/${currentRoomId}/members`, currentUser.uid));
+                if (!confirm("퇴장?")) return;
+                await deleteDoc(doc(db, `rooms/${rid}/members`, currentUser.uid));
+                if (activeUnreadListeners[rid]) { activeUnreadListeners[rid](); delete activeUnreadListeners[rid]; }
+                exitChatUI(rid); // [수정] 나가기 시 자물쇠 잠금
             }
-            exitChatUI();
-        };
-        
-        const exitChatUI = () => {
-            document.body.classList.remove('chat-open');
-            document.getElementById('chat-section').classList.add('hidden');
-            document.getElementById('chat-welcome').classList.remove('hidden');
-            currentRoomId = null;
-            if (unsubscribeMessages) unsubscribeMessages();
         };
 
         const emojis = ["😀","😃","😄","😁","😆","😅","😂","🤣","😍","🥰","😘","😋","😛","😜","🤪","🤨","🧐","😎","🥳","😏","😒","😞","😔","😟","😕","🙁","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🤭","🤫","🤥","😶","😐","😑","😬","🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪","😵","🤐","🥴","🤢","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👿","👹","👺","🤡","💩","👻","💀","☠️","👽","👾","🤖","🎃"];
@@ -562,10 +500,15 @@
         });
         document.getElementById('emoji-btn').onclick = (e) => { e.stopPropagation(); const p = document.getElementById('emoji-picker'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; };
         document.addEventListener('click', () => document.getElementById('emoji-picker').style.display = 'none');
+        
+        // [수정] 테마 변경 시 방별 테마 저장
         document.getElementById('cycle-theme-btn').onclick = () => {
+            if (!currentRoomId) return;
             const themes = ['theme-blue', 'theme-green', 'theme-purple', 'theme-dark'];
             const cur = Array.from(document.body.classList).find(c => c.startsWith('theme-')) || 'theme-blue';
-            document.body.className = themes[(themes.indexOf(cur) + 1) % themes.length] + (document.body.classList.contains('chat-open') ? ' chat-open' : '');
+            const next = themes[(themes.indexOf(cur) + 1) % themes.length];
+            roomThemes[currentRoomId] = next; // 방별 테마 저장
+            applyTheme(next);
         };
 
         const checkNotiPermission = () => {
@@ -579,7 +522,7 @@
             if (permission === "granted") {
                 checkNotiPermission();
                 navigator.serviceWorker.ready.then(reg => {
-                    reg.showNotification("A♥️J Cloud Chat", { body: "알림 설정 완료!", icon: "https://b-o-o-x.github.io/pwa/cloud-chat/cloud-chat-512.png" });
+                    reg.showNotification("알림 설정 완료!", { icon: "https://b-o-o-x.github.io/pwa/cloud-chat/cloud-chat-512.png" });
                 });
             }
         };
