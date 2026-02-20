@@ -157,7 +157,7 @@
         </main>
     </div>
 
-    <script type="module">
+   <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, serverTimestamp, doc, getDoc, setDoc, deleteDoc, where, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -179,7 +179,7 @@
         // 전역 변수
         let currentUser = null, currentRoomId = null, unsubscribeMessages = null, isInitialLoad = true, lastDateStr = null;
         let peer = null, localStream = null, currentCall = null, selectedUser = null;
-        const activeUnreadListeners = {}; // [수정] 모든 방 실시간 리스너 관리
+        const activeUnreadListeners = {}; 
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').then(() => console.log("SW Registered"));
@@ -273,9 +273,8 @@
             }
         };
 
-        // --- [수정] 통합 알림 로직 (방 이름 포함) ---
+        // --- 알림 로직 ---
         const triggerNoti = (msg, rid, roomName) => {
-            // 내가 보낸 메시지거나, 현재 해당 방 안에 있다면 알림 안 띄움
             if (msg.uid === currentUser.uid || currentRoomId === rid) return;
 
             const sound = document.getElementById('noti-sound');
@@ -283,7 +282,6 @@
             sound.play().catch(() => {});
 
             const toast = document.getElementById('notification-toast');
-            // 토스트에 방 이름과 보낸 사람 표시
             document.getElementById('noti-msg').innerText = `[${roomName}] ${msg.userName}: ${msg.text}`;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 3000);
@@ -293,13 +291,13 @@
                     reg.showNotification(`[${roomName}] ${msg.userName}`, {
                         body: msg.text,
                         icon: msg.userPhoto,
-                        tag: rid // 같은 방 알림은 하나로 그룹화
+                        tag: rid 
                     });
                 });
             }
         };
 
-        // [수정] 방 목록 로드 시 자물쇠 상태 실시간 반영
+        // [복구/수정] 방 목록 및 자물쇠 실시간 반영
         const loadRooms = () => {
             const q = query(collection(db, "rooms"), orderBy("createdAt", "desc"));
             onSnapshot(q, (snap) => {
@@ -320,8 +318,8 @@
                     
                     let lockIcon = "";
                     if (room.password) {
-                        // 이미 참여했다면 열린 자물쇠, 아니면 잠긴 자물쇠
-                        lockIcon = `<i class="fas fa-${isJoined ? 'lock-open' : 'lock'} text-[10px] ml-2 ${isJoined ? 'text-blue-400' : 'opacity-40'}"></i>`;
+                        // [수정] 자물쇠 아이콘 실시간 반영을 위해 class 추가
+                        lockIcon = `<i class="fas fa-${isJoined ? 'lock-open' : 'lock'} text-[10px] ml-2 ${isJoined ? 'text-blue-400' : 'opacity-40'} lock-status-icon"></i>`;
                     }
         
                     div.innerHTML = `
@@ -334,28 +332,19 @@
                     div.onclick = () => enterRoom(rid, room);
                     list.appendChild(div);
         
-                    // 참여 중인 방만 백그라운드 알림 활성화
                     if (isJoined) setupGlobalListener(rid, room.name);
                 });
                 
-                // 목록 로드가 끝나면 초기 로딩 플래그 해제 (알림 방지용)
                 setTimeout(() => { isInitialLoad = false; }, 2000);
             });
         };
 
-        // [수정] 전역 알림 리스너 보강
         const setupGlobalListener = (rid, roomName) => {
             if (activeUnreadListeners[rid]) return; 
-        
-            // 최신 메시지 1개만 감시
             const q = query(collection(db, `rooms/${rid}/messages`), orderBy("createdAt", "desc"), limit(1));
-            
             activeUnreadListeners[rid] = onSnapshot(q, (snap) => {
-                // 방에 처음 진입해서 로드 중일 때는 알림을 무시
                 if (snap.empty || isInitialLoad) return;
-        
                 snap.docChanges().forEach(change => {
-                    // 새로 추가된 메시지이고, 현재 내가 보고 있는 방이 아닐 때만
                     if (change.type === "added") {
                         const m = change.doc.data();
                         if (m.uid && m.uid !== currentUser.uid && currentRoomId !== rid) {
@@ -367,7 +356,6 @@
             });
         };
         
-        // [수정] 중복된 updateBadge 제거 및 통합
         const updateBadge = (rid) => {
             const badge = document.getElementById(`badge-${rid}`);
             if (!badge) return;
@@ -376,7 +364,7 @@
             badge.classList.remove('hidden');
         };
 
-        // --- 방 입장 로직 (비밀번호 검증 추가) ---
+        // --- 방 입장 로직 ---
         const enterRoom = async (id, room) => {
             if (currentRoomId === id) return;
 
@@ -384,17 +372,19 @@
             const memberSnap = await getDoc(memberRef);
             const isOwner = room.owner === currentUser.uid;
         
-            // 1. 암호 확인 및 멤버 등록
             if (room.password && !memberSnap.exists() && !isOwner) {
                 const inputPw = prompt("비밀번호를 입력하세요:");
                 if (inputPw === null) return;
                 if (inputPw !== room.password) return alert("비밀번호가 틀렸습니다.");
                 
-                // 비밀번호 맞으면 멤버 등록 (이 과정이 있어야 자물쇠가 열림)
                 await setDoc(memberRef, { joinedAt: serverTimestamp() });
+                // [추가] 입장 성공 시 UI의 자물쇠 즉시 변경
+                const lockIcon = document.querySelector(`#room-${id} .lock-status-icon`);
+                if(lockIcon) {
+                    lockIcon.className = "fas fa-lock-open text-[10px] ml-2 text-blue-400 lock-status-icon";
+                }
             }
             
-            // 2. 처음 입장하는 경우에만 입장 메시지 전송 및 입장 시간 기록
             if (!memberSnap.exists() && !isOwner) {
                 const now = serverTimestamp();
                 await setDoc(memberRef, { joinedAt: now });
@@ -403,13 +393,12 @@
                     type: "system",
                     createdAt: now
                 });
-                memberSnap = await getDoc(memberRef); // 갱신
             }
         
-            // 3. 입장 시간 저장 (본인이 만든 방이면 방 생성 시간 기준)
-            const joinTime = isOwner ? room.createdAt : memberSnap.data().joinedAt;
+            const finalMemberSnap = await getDoc(memberRef);
+            const joinTime = isOwner ? room.createdAt : finalMemberSnap.data().joinedAt;
             
-            // 입장 성공 시 뱃지 초기화
+            // [수정] 입장 시 뱃지 초기화 확실히 수행
             const badge = document.getElementById(`badge-${id}`);
             if (badge) {
                 badge.innerText = "0";
@@ -423,7 +412,6 @@
             document.getElementById('chat-welcome').classList.add('hidden');
             document.getElementById('current-room-title').innerText = room.name;
         
-            // 방장 여부에 따른 버튼 텍스트 변경
             const leaveBtn = document.getElementById('leave-room-btn');
             leaveBtn.innerText = isOwner ? "방 제거" : "나가기";
             leaveBtn.className = isOwner ? "text-[10px] font-bold px-2 py-1 border rounded-lg text-white bg-red-500" : "text-[10px] font-bold px-2 py-1 border rounded-lg text-red-500 bg-red-50";
@@ -433,18 +421,12 @@
         
         const loadMessages = (rid, joinTime) => {
             if (unsubscribeMessages) unsubscribeMessages();
-        
-            // 쿼리: 입장 시간(joinTime)보다 큰(이후인) 메시지만 가져오기
-            const q = query(
-                collection(db, `rooms/${rid}/messages`),
-                where("createdAt", ">=", joinTime), 
-                orderBy("createdAt", "asc")
-            );
+            const q = query(collection(db, `rooms/${rid}/messages`), where("createdAt", ">=", joinTime), orderBy("createdAt", "asc"));
         
             unsubscribeMessages = onSnapshot(q, (snap) => {
                 const box = document.getElementById('messages');
                 box.innerHTML = '';
-                lastDateStr = null;
+                lastDateStr = null; // 날짜 구분선 초기화 필수
         
                 if (snap.empty) {
                     box.innerHTML = '<div class="text-center text-gray-400 text-xs mt-10">새로운 대화를 시작해보세요!</div>';
@@ -456,16 +438,12 @@
                 box.scrollTop = box.scrollHeight;
                 isInitialLoad = false;
             }, (err) => {
-                // 방이 삭제되었을 때 처리
-                if (currentRoomId === rid) {
-                    alert("방이 존재하지 않거나 삭제되었습니다.");
-                    exitChatUI();
-                }
+                if (currentRoomId === rid) { alert("방이 존재하지 않거나 삭제되었습니다."); exitChatUI(); }
             });
         };
 
         const renderMsg = (m, box) => {
-            // 날짜 구분선 로직 추가
+            // [복구] 날짜 구분선 로직
             if (m.createdAt) {
                 const dateObj = m.createdAt.toDate();
                 const dateStr = dateObj.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
@@ -499,7 +477,7 @@
                 </div>`);
         };
 
-        // --- 기타 UI 제어 로직 ---
+        // --- 기타 UI 로직 ---
         let startX = 0;
         const chatCont = document.getElementById('chat-container');
         chatCont.addEventListener('touchstart', e => startX = e.touches[0].clientX, {passive:true});
@@ -540,23 +518,12 @@
         const send = async () => {
             const i = document.getElementById('msg-input'), t = i.value.trim();
             if (!t || !currentRoomId) return;
-        
-            // 전송 즉시 입력창 비우기 (사용자 경험)
-            i.value = ''; 
-            i.style.height = 'auto';
-        
+            i.value = ''; i.style.height = 'auto';
             try {
                 await addDoc(collection(db, `rooms/${currentRoomId}/messages`), {
-                    text: t,
-                    uid: currentUser.uid,
-                    userName: currentUser.displayName,
-                    userPhoto: currentUser.photoURL,
-                    createdAt: serverTimestamp() // 반드시 서버 시간을 사용
+                    text: t, uid: currentUser.uid, userName: currentUser.displayName, userPhoto: currentUser.photoURL, createdAt: serverTimestamp()
                 });
-            } catch (e) {
-                console.error("전송 실패:", e);
-                alert("메시지 전송에 실패했습니다.");
-            }
+            } catch (e) { alert("메시지 전송 실패"); }
         };
 
         document.getElementById('send-btn').onclick = send;
@@ -565,15 +532,11 @@
         
         document.getElementById('leave-room-btn').onclick = async () => {
             if (!currentRoomId) return;
-            
             const roomRef = doc(db, "rooms", currentRoomId);
             const roomSnap = await getDoc(roomRef);
             const isOwner = roomSnap.data().owner === currentUser.uid;
-        
             if (isOwner) {
-                if (!confirm("방을 삭제하시겠습니까? 모든 대화 내용이 사라집니다.")) return;
-                // 실제 운영 시에는 서브컬렉션(messages)도 지우는 Cloud Functions를 쓰거나 
-                // 그냥 방 문서만 지워도 리스너에서 에러가 나며 튕겨나갑니다.
+                if (!confirm("방을 삭제하시겠습니까?")) return;
                 await deleteDoc(roomRef); 
             } else {
                 if (!confirm("채팅방에서 나가시겠습니까?")) return;
