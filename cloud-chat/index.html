@@ -18,12 +18,11 @@
         .theme-dark { --main-color: #1f2937; --chat-bg: #111827; }
 
         .bg-main { background-color: var(--main-color); transition: background 0.3s; }
-        .text-main { color: var(--main-color); }
         .chat-area-bg { background-color: var(--chat-bg); transition: background 0.3s; }
         .big-emoji { font-size: 3.5rem; line-height: 1.2; padding: 10px 0; }
         
         #main-section { display: flex; flex: 1; width: 100vw; height: 100%; position: relative; overflow: hidden; }
-        #chat-container { display: flex; flex-direction: column; height: 100%; background: white; flex: 1; position: relative; min-width: 0; touch-action: pan-y; } /* 스와이프 간섭 방지 */
+        #chat-container { display: flex; flex-direction: column; height: 100%; background: white; flex: 1; position: relative; min-width: 0; touch-action: pan-y; }
         #messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; padding: 1rem; }
 
         @media (max-width: 768px) {
@@ -32,32 +31,32 @@
             body.chat-open #chat-container { transform: translateX(0); }
         }
 
-        /* 알림 및 배지 */
+        /* 배지 숫자 스타일 */
+        .unread-badge { background: #ff4757; color: white; font-size: 11px; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 10px; font-weight: bold; padding: 0 5px; margin-left: auto; box-shadow: 0 2px 5px rgba(255,71,87,0.3); }
+
+        /* 알림 토스트 */
         #notification-toast {
             position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
             width: 90%; max-width: 350px; background: rgba(0,0,0,0.85); color: white;
             padding: 12px 20px; border-radius: 50px; z-index: 9999;
             display: flex; align-items: center; gap: 10px; transition: 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3); pointer-events: none;
         }
         #notification-toast.show { top: 20px; }
-        .unread-badge { background: #ef4444; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: bold; margin-left: 5px; }
 
         /* 날짜 구분선 */
-        .date-divider { display: flex; align-items: center; text-align: center; margin: 20px 0; color: #9ca3af; font-size: 11px; font-weight: 600; }
+        .date-divider { display: flex; align-items: center; text-align: center; margin: 25px 0; color: #9ca3af; font-size: 11px; font-weight: 600; }
         .date-divider::before, .date-divider::after { content: ''; flex: 1; border-bottom: 1px solid #e5e7eb; }
-        .date-divider:not(:empty)::before { margin-right: 1em; }
-        .date-divider:not(:empty)::after { margin-left: 1em; }
+        .date-divider:not(:empty)::before { margin-right: 1.5em; }
+        .date-divider:not(:empty)::after { margin-left: 1.5em; }
 
         /* 이모지 픽커 */
         #emoji-picker { display: none; position: absolute; bottom: 85px; left: 15px; background: white; border: 1px solid #ddd; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 280px; z-index: 100; padding: 10px; }
         .emoji-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; max-height: 200px; overflow-y: auto; }
-        .emoji-item { cursor: pointer; font-size: 1.5rem; text-align: center; border-radius: 8px; padding: 5px; }
+        .emoji-item { cursor: pointer; font-size: 1.5rem; text-align: center; padding: 5px; }
 
-        /* 입력바 */
         .input-area-wrapper { display: flex; align-items: flex-end; gap: 8px; width: 100%; background: white; padding: 10px 12px; box-sizing: border-box; }
         .text-input-container { flex: 1; min-width: 0; background: #f3f4f6; border-radius: 20px; display: flex; align-items: flex-end; padding: 0 12px; }
-        #send-btn { width: 40px; height: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; background-color: var(--main-color); color: white; margin-bottom: 2px; }
+        #send-btn { width: 40px; height: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%; background-color: var(--main-color); color: white; }
     </style>
 </head>
 <body class="theme-blue">
@@ -71,10 +70,10 @@
     <div id="auth-section" class="fixed inset-0 bg-white z-[1000] flex items-center justify-center p-6 text-center">
         <div>
             <h1 class="text-3xl font-bold mb-8 text-blue-600 tracking-tight">A♥️J Cloud Chat Pro</h1>
-            <button id="login-btn" class="flex items-center gap-3 px-8 py-3 border rounded-full hover:bg-gray-50 transition shadow-sm mx-auto">
+            <button id="login-btn" class="flex items-center gap-3 px-8 py-3 border rounded-full hover:bg-gray-50 transition shadow-sm mx-auto mb-4">
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6"> Google 로그인
             </button>
-            <p class="text-xs text-gray-400 mt-6">알림을 받으려면 로그인 후 권한을 허용해 주세요.</p>
+            <p class="text-xs text-gray-400">아이폰은 '홈 화면에 추가' 후 알림을 허용해주세요.</p>
         </div>
     </div>
 
@@ -82,22 +81,21 @@
         <aside id="side-bar" class="w-80 bg-white border-r flex flex-col h-full shadow-lg">
             <div class="p-4 bg-main text-white flex justify-between items-center shadow-md">
                 <div class="flex items-center gap-2">
-                    <img id="user-photo" class="w-8 h-8 rounded-full border border-white/20 shadow-sm">
+                    <img id="user-photo" class="w-8 h-8 rounded-full border border-white/20">
                     <span id="user-name" class="font-bold text-sm truncate">사용자</span>
                 </div>
-                <button id="logout-btn" class="p-2 opacity-80 hover:opacity-100"><i class="fas fa-sign-out-alt"></i></button>
+                <button id="logout-btn" class="p-2 opacity-80"><i class="fas fa-sign-out-alt"></i></button>
             </div>
             <div id="room-list" class="flex-1 overflow-y-auto p-2 space-y-1 bg-gray-50"></div>
             <div class="p-4 border-t bg-white">
                 <input type="text" id="new-room-name" placeholder="방 이름" class="w-full p-2.5 bg-gray-50 border rounded-xl text-sm outline-none mb-2">
-                <input type="password" id="new-room-pw" placeholder="암호(선택)" class="w-full p-2.5 bg-gray-50 border rounded-xl text-sm outline-none mb-2">
-                <button id="create-room-btn" class="w-full bg-main text-white py-2.5 rounded-xl font-bold text-sm shadow-md active:scale-95 transition">+ 방 만들기</button>
+                <button id="create-room-btn" class="w-full bg-main text-white py-2.5 rounded-xl font-bold text-sm shadow-md">+ 방 만들기</button>
             </div>
         </aside>
 
         <main id="chat-container">
             <div id="chat-welcome" class="flex-1 flex flex-col items-center justify-center text-gray-300">
-                <i class="fas fa-comment-dots text-7xl mb-4 opacity-10"></i>
+                <i class="fas fa-comments text-7xl mb-4 opacity-10"></i>
                 <p>대화방을 선택하세요</p>
             </div>
 
@@ -107,27 +105,20 @@
                         <button id="back-btn" class="md:hidden text-gray-500 w-8 h-8"><i class="fas fa-arrow-left"></i></button>
                         <h2 id="current-room-title" class="font-bold text-gray-800 truncate text-sm">채팅방</h2>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button id="cycle-theme-btn" class="text-[10px] font-bold px-2 py-1 border rounded-lg hover:bg-gray-50">THEME</button>
-                        <button id="room-action-btn" class="text-[10px] font-bold px-2 py-1 border rounded-lg bg-red-50 text-red-500">나가기</button>
-                    </div>
+                    <button id="cycle-theme-btn" class="text-[10px] font-bold px-2 py-1 border rounded-lg">THEME</button>
                 </header>
 
                 <div id="messages" class="chat-area-bg"></div>
 
-                <div id="emoji-picker">
-                    <div class="emoji-grid" id="emoji-grid"></div>
-                </div>
+                <div id="emoji-picker"><div class="emoji-grid" id="emoji-grid"></div></div>
 
                 <div class="border-t bg-white safe-area-bottom">
                     <div class="input-area-wrapper">
-                        <button id="emoji-btn" class="p-2 text-gray-400 flex-shrink-0"><i class="far fa-smile text-2xl"></i></button>
+                        <button id="emoji-btn" class="p-2 text-gray-400"><i class="far fa-smile text-2xl"></i></button>
                         <div class="text-input-container">
                             <textarea id="msg-input" rows="1" placeholder="메시지 입력..." class="w-full bg-transparent border-none py-3 text-[15px] outline-none resize-none max-h-32"></textarea>
                         </div>
-                        <button id="send-btn" class="active:scale-90 transition shadow-lg">
-                            <i class="fas fa-paper-plane text-sm"></i>
-                        </button>
+                        <button id="send-btn"><i class="fas fa-paper-plane text-sm"></i></button>
                     </div>
                 </div>
             </div>
@@ -137,7 +128,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, serverTimestamp, doc, getDoc, setDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, serverTimestamp, doc, getDoc, setDoc, where, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDIp1Hb0FT5vgK7QZWY89RmEmWbnj5KRM4",
@@ -153,249 +144,187 @@
         const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
 
-        let currentUser = null;
-        let currentRoomId = null;
-        let unsubscribeMessages = null;
-        let isInitialLoad = true;
-        let lastDateStr = null;
-        const roomListeners = {};
+        let currentUser = null, currentRoomId = null, unsubscribeMessages = null, isInitialLoad = true, lastDateStr = null;
+        const unreadListeners = {};
 
-        // --- 알림 처리 ---
-        async function requestNotiPermission() {
-            if ("Notification" in window && Notification.permission !== "granted") {
-                await Notification.requestPermission();
-            }
-        }
-
-        function triggerNotification(msg, roomId) {
+        // --- 1. 알림 및 권한 ---
+        const triggerNoti = (msg, rid) => {
             if (msg.uid === currentUser.uid || isInitialLoad) return;
-            
-            // 1. 소리 재생
             document.getElementById('noti-sound').play().catch(()=>{});
-
-            // 2. 인앱 토스트 (방에 있더라도 나한테 온 거면 띄움)
             const toast = document.getElementById('notification-toast');
             document.getElementById('noti-msg').innerText = `${msg.userName}: ${msg.text}`;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 3000);
 
-            // 3. 시스템 알림 (배경 알림)
-            if (Notification.permission === "granted" && (currentRoomId !== roomId || document.hidden)) {
-                try {
-                    new Notification(`Cloud Chat: ${msg.userName}`, { body: msg.text, icon: msg.userPhoto });
-                } catch (e) { console.log("알림 에러:", e); }
+            if (Notification.permission === "granted" && (currentRoomId !== rid || document.hidden)) {
+                new Notification(msg.userName, { body: msg.text, icon: msg.userPhoto });
             }
-        }
+        };
 
-        // --- 날짜 포맷 (2026-02-20) ---
-        function formatDate(date) {
-            const y = date.getFullYear();
-            const m = String(date.getMonth() + 1).padStart(2, '0');
-            const d = String(date.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        }
-
-        // --- 방 리스트 로드 ---
-        async function loadRooms() {
-            onSnapshot(query(collection(db, "rooms"), orderBy("createdAt", "desc")), async (snapshot) => {
+        // --- 2. 방 리스트 & 실시간 배지 로직 ---
+        const loadRooms = () => {
+            onSnapshot(query(collection(db, "rooms"), orderBy("createdAt", "desc")), (snap) => {
                 const list = document.getElementById('room-list');
                 list.innerHTML = '';
-                
-                snapshot.docs.forEach(async (docSnap) => {
-                    const room = docSnap.data();
-                    const rid = docSnap.id;
-                    const memberRef = doc(db, `rooms/${rid}/members`, currentUser.uid);
-                    const memberSnap = await getDoc(memberRef);
-                    const isJoined = memberSnap.exists() || room.owner === currentUser.uid;
-
+                snap.docs.forEach(async d => {
+                    const room = d.data(), rid = d.id;
                     const div = document.createElement('div');
                     div.id = `room-${rid}`;
-                    div.className = `p-4 m-1 rounded-2xl cursor-pointer flex justify-between items-center transition ${currentRoomId === rid ? 'bg-main text-white shadow-md' : 'bg-white border text-gray-700 hover:bg-gray-50'}`;
-                    
-                    let lockIcon = room.password ? `<i class="fas fa-${isJoined ? 'lock-open' : 'lock'} text-[10px] opacity-40 ml-2"></i>` : "";
-                    div.innerHTML = `
-                        <div class="flex items-center overflow-hidden">
-                            <span class="text-sm font-bold truncate">${room.name}</span>
-                            ${lockIcon}
-                            <span id="badge-${rid}" class="unread-badge hidden">0</span>
-                        </div>`;
-                    
+                    div.className = `p-4 m-1 rounded-2xl cursor-pointer flex items-center transition ${currentRoomId === rid ? 'bg-main text-white shadow-md' : 'bg-white border text-gray-700'}`;
+                    div.innerHTML = `<span class="text-sm font-bold truncate">${room.name}</span><span id="badge-${rid}" class="unread-badge hidden">0</span>`;
                     div.onclick = () => enterRoom(rid, room);
                     list.appendChild(div);
-
-                    if (isJoined) watchUnread(rid);
+                    watchUnread(rid);
                 });
             });
-        }
+        };
 
-        function watchUnread(rid) {
-            if (roomListeners[rid]) return;
-            roomListeners[rid] = onSnapshot(query(collection(db, `rooms/${rid}/messages`), orderBy("createdAt", "desc"), limit(1)), (snap) => {
+        const watchUnread = (rid) => {
+            if (unreadListeners[rid]) unreadListeners[rid]();
+            // lastRead 이후의 모든 메시지를 감시
+            const lastRead = parseInt(localStorage.getItem(`lastRead_${rid}_${currentUser.uid}`)) || 0;
+            const q = query(collection(db, `rooms/${rid}/messages`), where("createdAt", ">", new Date(lastRead)));
+            
+            unreadListeners[rid] = onSnapshot(q, (snap) => {
                 const badge = document.getElementById(`badge-${rid}`);
                 if (!badge || currentRoomId === rid) return;
                 
-                const lastRead = parseInt(localStorage.getItem(`lastRead_${rid}_${currentUser.uid}`)) || 0;
-                const lastMsg = snap.docs[0]?.data();
-                
-                if (lastMsg && lastMsg.createdAt?.toMillis() > lastRead && lastMsg.uid !== currentUser.uid) {
-                    badge.innerText = "N"; // 단순하게 New 표시 (개별 쿼리 최소화)
+                // 내가 쓰지 않은 메시지만 필터링하여 개수 산정
+                const count = snap.docs.filter(doc => doc.data().uid !== currentUser.uid).length;
+                if (count > 0) {
+                    badge.innerText = count > 99 ? '99+' : count;
                     badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
                 }
             });
-        }
+        };
 
-        async function enterRoom(id, room) {
+        // --- 3. 방 입장 및 메시지 읽음 처리 ---
+        const enterRoom = async (id, room) => {
             if (currentRoomId === id) return;
-            isInitialLoad = true;
-            lastDateStr = null;
+            isInitialLoad = true; lastDateStr = null;
             document.getElementById('messages').innerHTML = '';
             
-            // 배지 즉시 삭제
+            // 입장 즉시 읽음 처리 및 배지 제거
+            localStorage.setItem(`lastRead_${id}_${currentUser.uid}`, Date.now());
             const badge = document.getElementById(`badge-${id}`);
             if (badge) badge.classList.add('hidden');
-            localStorage.setItem(`lastRead_${id}_${currentUser.uid}`, Date.now());
-
-            const memberRef = doc(db, `rooms/${id}/members`, currentUser.uid);
-            let memberSnap = await getDoc(memberRef);
-
-            if (!memberSnap.exists() && room.owner !== currentUser.uid) {
-                if (room.password && prompt("비밀번호:") !== room.password) return;
-                await setDoc(memberRef, { joinedAt: serverTimestamp() });
-                memberSnap = await getDoc(memberRef);
-            }
 
             currentRoomId = id;
-            document.getElementById('room-action-btn').innerText = (room.owner === currentUser.uid) ? "방 삭제" : "나가기";
             document.body.classList.add('chat-open');
             document.getElementById('chat-welcome').classList.add('hidden');
             document.getElementById('chat-section').classList.remove('hidden');
             document.getElementById('current-room-title').innerText = room.name;
 
             if (unsubscribeMessages) unsubscribeMessages();
-            const joinedAt = (room.owner === currentUser.uid) ? new Date(0) : memberSnap.data()?.joinedAt?.toDate() || new Date();
-            loadMessages(id, joinedAt);
-        }
+            loadMessages(id);
+        };
 
-        function loadMessages(roomId, joinedAt) {
-            const q = query(collection(db, `rooms/${roomId}/messages`), orderBy("createdAt", "asc"), where("createdAt", ">=", joinedAt));
-            unsubscribeMessages = onSnapshot(q, (snapshot) => {
-                const msgDiv = document.getElementById('messages');
-                snapshot.docChanges().forEach(change => {
+        const loadMessages = (rid) => {
+            const q = query(collection(db, `rooms/${rid}/messages`), orderBy("createdAt", "asc"));
+            unsubscribeMessages = onSnapshot(q, (snap) => {
+                const box = document.getElementById('messages');
+                snap.docChanges().forEach(change => {
                     if (change.type === "added") {
-                        const msg = change.doc.data();
-                        const msgDate = msg.createdAt?.toDate() || new Date();
-                        const dateStr = formatDate(msgDate);
-
-                        if (lastDateStr !== dateStr) {
-                            msgDiv.innerHTML += `<div class="date-divider">${dateStr}</div>`;
-                            lastDateStr = dateStr;
+                        const m = change.doc.data();
+                        const dStr = m.createdAt ? new Date(m.createdAt.toMillis()).toLocaleDateString('ko-KR', {year:'numeric', month:'2-digit', day:'2-digit'}).replace(/\. /g, '-').replace('.','') : "";
+                        
+                        if (dStr && lastDateStr !== dStr) {
+                            box.innerHTML += `<div class="date-divider">${dStr}</div>`;
+                            lastDateStr = dStr;
                         }
-                        renderMessage(msg, msgDiv);
-                        triggerNotification(msg, roomId);
-                        if (currentRoomId === roomId) localStorage.setItem(`lastRead_${roomId}_${currentUser.uid}`, Date.now());
+                        renderMsg(m, box);
+                        triggerNoti(m, rid);
+                        // 방 안에 있을 때 메시지가 오면 실시간으로 lastRead 갱신
+                        if (currentRoomId === rid) localStorage.setItem(`lastRead_${rid}_${currentUser.uid}`, Date.now());
                     }
                 });
                 isInitialLoad = false;
-                msgDiv.scrollTop = msgDiv.scrollHeight;
+                box.scrollTop = box.scrollHeight;
             });
-        }
+        };
 
-        function renderMessage(msg, container) {
-            const isMe = msg.uid === currentUser.uid;
-            const timeStr = msg.createdAt ? new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: 'numeric', hour12: true }).format(msg.createdAt.toDate()) : "";
-            const emojiRegex = /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])$/;
-            const isEmoji = emojiRegex.test(msg.text?.trim());
+        const renderMsg = (m, box) => {
+            const isMe = m.uid === currentUser.uid;
+            const tStr = m.createdAt ? new Intl.DateTimeFormat('ko-KR', { hour: 'numeric', minute: 'numeric', hour12: true }).format(m.createdAt.toDate()) : "";
+            const isEmoji = /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])$/.test(m.text?.trim());
 
-            if (msg.type === 'system') {
-                container.innerHTML += `<div class="text-center text-[10px] text-gray-400 my-4">${msg.text}</div>`;
-            } else {
-                container.innerHTML += `
-                    <div class="flex ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end gap-1 mb-4">
-                        <img src="${msg.userPhoto}" class="w-8 h-8 rounded-full border mb-4 flex-shrink-0">
-                        <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]">
-                            <span class="text-[9px] text-gray-400 px-1 mb-0.5">${msg.userName}</span>
-                            <div class="${isEmoji ? 'big-emoji' : `px-3 py-2 rounded-2xl text-[14px] shadow-sm ${isMe ? 'bg-main text-white rounded-tr-none' : 'bg-white text-gray-800 border rounded-tl-none'}`}">
-                                ${msg.text.replace(/\n/g, '<br>')}
-                            </div>
+            box.innerHTML += `
+                <div class="flex ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end gap-1 mb-4">
+                    <img src="${m.userPhoto}" class="w-8 h-8 rounded-full border mb-4 flex-shrink-0">
+                    <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]">
+                        <span class="text-[9px] text-gray-400 px-1 mb-0.5">${m.userName}</span>
+                        <div class="${isEmoji ? 'big-emoji' : `px-3 py-2 rounded-2xl text-[14px] shadow-sm ${isMe ? 'bg-main text-white rounded-tr-none' : 'bg-white text-gray-800 border rounded-tl-none'}`}">
+                            ${m.text.replace(/\n/g, '<br>')}
                         </div>
-                        <span class="text-[8px] text-gray-400 pb-1 flex-shrink-0">${timeStr}</span>
-                    </div>`;
-            }
-        }
+                    </div>
+                    <span class="text-[8px] text-gray-400 pb-1 flex-shrink-0">${tStr}</span>
+                </div>`;
+        };
 
-        // --- 스와이프 뒤로가기 로직 ---
-        let touchStartX = 0;
-        const chatContainer = document.getElementById('chat-container');
-        chatContainer.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, {passive: true});
-        chatContainer.addEventListener('touchend', e => {
-            const touchEndX = e.changedTouches[0].clientX;
-            const diff = touchEndX - touchStartX;
-            if (diff > 80 && document.body.classList.contains('chat-open')) {
+        // --- 4. 스와이프 뒤로가기 ---
+        let startX = 0;
+        const chatCont = document.getElementById('chat-container');
+        chatCont.addEventListener('touchstart', e => startX = e.touches[0].clientX, {passive:true});
+        chatCont.addEventListener('touchend', e => {
+            if (e.changedTouches[0].clientX - startX > 100 && document.body.classList.contains('chat-open')) {
                 document.body.classList.remove('chat-open');
                 currentRoomId = null;
+                loadRooms(); // 목록 복구 시 배지 상태 동기화
             }
-        }, {passive: true});
+        }, {passive:true});
 
-        // --- 앱 상태 감지 ---
-        onAuthStateChanged(auth, user => {
-            if (user) {
-                currentUser = user;
+        // --- 5. 로그인 & 기타 ---
+        onAuthStateChanged(auth, u => {
+            if (u) {
+                currentUser = u;
                 document.getElementById('auth-section').classList.add('hidden');
                 document.getElementById('main-section').classList.remove('hidden');
-                document.getElementById('user-name').innerText = user.displayName;
-                document.getElementById('user-photo').src = user.photoURL;
-                requestNotiPermission();
+                document.getElementById('user-name').innerText = u.displayName;
+                document.getElementById('user-photo').src = u.photoURL;
+                if ("Notification" in window) Notification.requestPermission();
                 loadRooms();
             } else {
                 document.getElementById('auth-section').classList.remove('hidden');
-                document.getElementById('main-section').classList.add('hidden');
             }
         });
 
         document.getElementById('login-btn').onclick = () => signInWithPopup(auth, provider);
         document.getElementById('logout-btn').onclick = () => signOut(auth);
-
-        const sendMessage = async () => {
-            const input = document.getElementById('msg-input');
-            const text = input.value.trim();
-            if (!text || !currentRoomId) return;
-            await addDoc(collection(db, `rooms/${currentRoomId}/messages`), {
-                text, uid: currentUser.uid, userName: currentUser.displayName, userPhoto: currentUser.photoURL, createdAt: serverTimestamp()
-            });
-            input.value = ''; input.style.height = 'auto';
+        document.getElementById('create-room-btn').onclick = async () => {
+            const n = document.getElementById('new-room-name').value.trim();
+            if (!n) return;
+            await addDoc(collection(db, "rooms"), { name: n, owner: currentUser.uid, createdAt: serverTimestamp() });
+            document.getElementById('new-room-name').value = '';
         };
 
-        document.getElementById('send-btn').onclick = sendMessage;
-        document.getElementById('msg-input').onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
-        document.getElementById('back-btn').onclick = () => { document.body.classList.remove('chat-open'); currentRoomId = null; };
+        const send = async () => {
+            const i = document.getElementById('msg-input'), t = i.value.trim();
+            if (!t || !currentRoomId) return;
+            await addDoc(collection(db, `rooms/${currentRoomId}/messages`), {
+                text: t, uid: currentUser.uid, userName: currentUser.displayName, userPhoto: currentUser.photoURL, createdAt: serverTimestamp()
+            });
+            i.value = ''; i.style.height = 'auto';
+        };
 
-        // 테마/이모지 등 나머지 버튼들
+        document.getElementById('send-btn').onclick = send;
+        document.getElementById('msg-input').onkeydown = e => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
+        document.getElementById('back-btn').onclick = () => { document.body.classList.remove('chat-open'); currentRoomId = null; loadRooms(); };
+
         const emojis = ["😀","😃","😄","😁","😆","😅","😂","🤣","😍","🥰","😘","😋","😛","😜","🤪","🤨","🧐","😎","🥳","😏","😒","😞","😔","😟","😕","🙁","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🤭","🤫","🤥","😶","😐","😑","😬","🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪","😵","🤐","🥴","🤢","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👿","👹","👺","🤡","💩","👻","💀","☠️","👽","👾","🤖","🎃"];
         const grid = document.getElementById('emoji-grid');
         emojis.forEach(e => {
-            const btn = document.createElement('div'); btn.className = 'emoji-item'; btn.innerText = e;
-            btn.onclick = () => { document.getElementById('msg-input').value += e; };
-            grid.appendChild(btn);
+            const b = document.createElement('div'); b.className = 'emoji-item cursor-pointer'; b.innerText = e;
+            b.onclick = () => { document.getElementById('msg-input').value += e; };
+            grid.appendChild(b);
         });
-        document.getElementById('emoji-btn').onclick = (e) => {
-            e.stopPropagation();
-            const p = document.getElementById('emoji-picker');
-            p.style.display = p.style.display === 'block' ? 'none' : 'block';
-        };
+        document.getElementById('emoji-btn').onclick = (e) => { e.stopPropagation(); const p = document.getElementById('emoji-picker'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; };
         document.addEventListener('click', () => document.getElementById('emoji-picker').style.display = 'none');
         document.getElementById('cycle-theme-btn').onclick = () => {
             const themes = ['theme-blue', 'theme-green', 'theme-purple', 'theme-dark'];
-            const currentTheme = Array.from(document.body.classList).find(c => c.startsWith('theme-')) || 'theme-blue';
-            const nextTheme = themes[(themes.indexOf(currentTheme) + 1) % themes.length];
-            document.body.className = nextTheme + (document.body.classList.contains('chat-open') ? ' chat-open' : '');
-            localStorage.setItem(`theme_${currentRoomId}`, nextTheme);
-        };
-        document.getElementById('create-room-btn').onclick = async () => {
-            const name = document.getElementById('new-room-name').value.trim();
-            const password = document.getElementById('new-room-pw').value;
-            if (!name) return alert("방 이름을 입력하세요.");
-            await addDoc(collection(db, "rooms"), { name, password, owner: currentUser.uid, createdAt: serverTimestamp() });
-            document.getElementById('new-room-name').value = ''; document.getElementById('new-room-pw').value = '';
+            const cur = Array.from(document.body.classList).find(c => c.startsWith('theme-')) || 'theme-blue';
+            document.body.className = themes[(themes.indexOf(cur) + 1) % themes.length] + (document.body.classList.contains('chat-open') ? ' chat-open' : '');
         };
     </script>
 </body>
