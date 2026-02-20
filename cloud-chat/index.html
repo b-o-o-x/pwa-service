@@ -389,36 +389,54 @@
         const loadMessages = (rid) => {
             if (unsubscribeMessages) unsubscribeMessages();
         
-            const q = query(collection(db, `rooms/${rid}/messages`), orderBy("createdAt", "asc"));
+            // 1. 쿼리 최적화: 최신 50개만 가져오기 (성능과 정확도 확보)
+            const q = query(
+                collection(db, `rooms/${rid}/messages`), 
+                orderBy("createdAt", "asc"),
+                limitToLast(50) // 너무 많으면 느려지니 최근 50개만!
+            );
+        
             unsubscribeMessages = onSnapshot(q, (snap) => {
                 const box = document.getElementById('messages');
                 
-                snap.docChanges().forEach(change => {
-                    if (change.type === "added") {
-                        const m = change.doc.data();
-                        
-                        // createdAt이 null일 때(서버 전송 중)도 현재 시간으로 즉시 표시하여 내 메시지 실종 방지
-                        const dateObj = m.createdAt ? m.createdAt.toDate() : new Date();
-                        const dStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`;
-                        
-                        if (lastDateStr !== dStr) {
-                            const divider = document.createElement('div');
-                            divider.className = 'date-divider';
-                            divider.innerText = dStr;
-                            box.appendChild(divider);
-                            lastDateStr = dStr;
-                        }
-                        
-                        renderMsg(m, box);
-                        
-                        // 마지막 읽은 시간 업데이트
-                        if (currentRoomId === rid) {
-                            localStorage.setItem(`lastRead_${rid}_${currentUser.uid}`, Date.now());
-                        }
+                // [중요] 일단 화면을 비웁니다. (중복 출력 원천 차단)
+                box.innerHTML = '';
+                lastDateStr = null;
+        
+                snap.docs.forEach(docSnap => {
+                    const m = docSnap.data();
+                    
+                    // [중요] 서버 타임스탬프가 아직 생성되지 않은(전송 중인) 메시지는 
+                    // 서버 확정 전까지 출력을 대기시키거나 임시 처리합니다.
+                    if (!m.createdAt) return; 
+        
+                    const dateObj = m.createdAt.toDate();
+                    const dStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`;
+        
+                    // 날짜 구분선
+                    if (lastDateStr !== dStr) {
+                        const divider = document.createElement('div');
+                        divider.className = 'date-divider';
+                        divider.innerText = dStr;
+                        box.appendChild(divider);
+                        lastDateStr = dStr;
                     }
+        
+                    // 메시지 렌더링
+                    renderMsg(m, box);
                 });
-                isInitialLoad = false;
+        
+                // 스크롤 하단 이동
                 box.scrollTop = box.scrollHeight;
+        
+                // 알림 로직 분리 (필요 시 호출)
+                if (!isInitialLoad) {
+                    const lastMsg = snap.docs[snap.docs.length - 1]?.data();
+                    if (lastMsg && lastMsg.uid !== currentUser.uid) {
+                        // 여기서 알림 트리거 (중복 알림 방지 로직 포함 권장)
+                    }
+                }
+                isInitialLoad = false;
             });
         };
 
@@ -482,10 +500,23 @@
         const send = async () => {
             const i = document.getElementById('msg-input'), t = i.value.trim();
             if (!t || !currentRoomId) return;
-            await addDoc(collection(db, `rooms/${currentRoomId}/messages`), {
-                text: t, uid: currentUser.uid, userName: currentUser.displayName, userPhoto: currentUser.photoURL, createdAt: serverTimestamp()
-            });
-            i.value = ''; i.style.height = 'auto';
+        
+            // 전송 즉시 입력창 비우기 (사용자 경험)
+            i.value = ''; 
+            i.style.height = 'auto';
+        
+            try {
+                await addDoc(collection(db, `rooms/${currentRoomId}/messages`), {
+                    text: t,
+                    uid: currentUser.uid,
+                    userName: currentUser.displayName,
+                    userPhoto: currentUser.photoURL,
+                    createdAt: serverTimestamp() // 반드시 서버 시간을 사용
+                });
+            } catch (e) {
+                console.error("전송 실패:", e);
+                alert("메시지 전송에 실패했습니다.");
+            }
         };
 
         document.getElementById('send-btn').onclick = send;
