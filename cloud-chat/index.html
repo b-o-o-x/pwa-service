@@ -299,15 +299,17 @@
             }
         };
 
-        // --- [수정] 방 목록 로드 및 전체 실시간 감시 ---
+        // [수정] 방 목록 로드 시 자물쇠 상태 실시간 반영
         const loadRooms = () => {
-            onSnapshot(query(collection(db, "rooms"), orderBy("createdAt", "desc")), (snap) => {
+            const q = query(collection(db, "rooms"), orderBy("createdAt", "desc"));
+            onSnapshot(q, (snap) => {
                 const list = document.getElementById('room-list');
                 list.innerHTML = '';
-                snap.docs.forEach(async d => {
+                
+                snap.docs.forEach(async (d) => {
                     const room = d.data(), rid = d.id;
                     
-                    // 참여 여부 확인 (방장이거나 멤버 컬렉션에 존재하거나)
+                    // 참여 여부 확인
                     const memberRef = doc(db, `rooms/${rid}/members`, currentUser.uid);
                     const memberSnap = await getDoc(memberRef);
                     const isJoined = memberSnap.exists() || room.owner === currentUser.uid;
@@ -316,9 +318,9 @@
                     div.id = `room-${rid}`;
                     div.className = `p-4 m-1 rounded-2xl cursor-pointer flex items-center transition ${currentRoomId === rid ? 'bg-main text-white shadow-md' : 'bg-white border text-gray-700'}`;
                     
-                    // 암호가 있고 아직 참여하지 않은 경우만 잠긴 자물쇠, 참여했다면 열린 자물쇠
                     let lockIcon = "";
                     if (room.password) {
+                        // 이미 참여했다면 열린 자물쇠, 아니면 잠긴 자물쇠
                         lockIcon = `<i class="fas fa-${isJoined ? 'lock-open' : 'lock'} text-[10px] ml-2 ${isJoined ? 'text-blue-400' : 'opacity-40'}"></i>`;
                     }
         
@@ -332,28 +334,30 @@
                     div.onclick = () => enterRoom(rid, room);
                     list.appendChild(div);
         
-                    // 알림 리스너 등록 (이미 참여 중인 방만)
+                    // 참여 중인 방만 백그라운드 알림 활성화
                     if (isJoined) setupGlobalListener(rid, room.name);
                 });
+                
+                // 목록 로드가 끝나면 초기 로딩 플래그 해제 (알림 방지용)
+                setTimeout(() => { isInitialLoad = false; }, 2000);
             });
         };
 
-        // --- [신규] 모든 방의 메시지를 밖에서도 감시하는 리스너 ---
-       const setupGlobalListener = (rid, roomName) => {
+        // [수정] 전역 알림 리스너 보강
+        const setupGlobalListener = (rid, roomName) => {
             if (activeUnreadListeners[rid]) return; 
         
-            // 최신 메시지 1개만 계속 감시
+            // 최신 메시지 1개만 감시
             const q = query(collection(db, `rooms/${rid}/messages`), orderBy("createdAt", "desc"), limit(1));
             
             activeUnreadListeners[rid] = onSnapshot(q, (snap) => {
-                // 초기 로딩 중이거나 데이터가 없으면 무시
+                // 방에 처음 진입해서 로드 중일 때는 알림을 무시
                 if (snap.empty || isInitialLoad) return;
         
                 snap.docChanges().forEach(change => {
+                    // 새로 추가된 메시지이고, 현재 내가 보고 있는 방이 아닐 때만
                     if (change.type === "added") {
                         const m = change.doc.data();
-                        
-                        // 내가 보낸 게 아니고, 현재 이 방을 보고 있지 않을 때만 알림
                         if (m.uid && m.uid !== currentUser.uid && currentRoomId !== rid) {
                             triggerNoti(m, rid, roomName);
                             updateBadge(rid); 
@@ -363,14 +367,7 @@
             });
         };
         
-        const updateBadge = (rid) => {
-            const badge = document.getElementById(`badge-${rid}`);
-            if (!badge) return;
-            let count = parseInt(badge.innerText) || 0;
-            badge.innerText = count + 1;
-            badge.classList.remove('hidden');
-        };
-
+        // [수정] 중복된 updateBadge 제거 및 통합
         const updateBadge = (rid) => {
             const badge = document.getElementById(`badge-${rid}`);
             if (!badge) return;
