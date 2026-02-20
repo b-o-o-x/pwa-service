@@ -157,7 +157,7 @@
         </main>
     </div>
 
-   <script type="module">
+    <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, serverTimestamp, doc, getDoc, setDoc, deleteDoc, where, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
@@ -188,6 +188,53 @@
 
         // --- 보이스 통화 엔진 (PeerJS) ---
         const initPeer = (uid) => {
+            peer = new Peer(uid);
+            peer.on('call', async (incomingCall) => {
+                // 1. 시스템 진동 (패턴: 1초 진동, 0.5초 쉬고, 1초 진동...)
+                if ("vibrate" in navigator) {
+                    navigator.vibrate([1000, 500, 1000, 500, 1000]);
+                }
+        
+                // 2. 사운드 재생 (기존 코드 유지하되 반복 재생 권장)
+                const sound = document.getElementById('noti-sound');
+                sound.loop = true; // 통화 응답 전까지 계속 울림
+                sound.play().catch(() => {});
+        
+                // 3. 브라우저 시스템 알림 강제 호출
+                if (Notification.permission === "granted") {
+                    new Notification("📞 보이스톡 도착", {
+                        body: "상대방이 통화를 원합니다. 앱으로 돌아와주세요!",
+                        icon: "https://b-o-o-x.github.io/pwa/cloud-chat/cloud-chat-512.png",
+                        tag: "voice-call", // 중복 알림 방지
+                        requireInteraction: true // 사용자가 닫기 전까지 유지
+                    });
+                }
+        
+                showCallOverlay("상대방", "", true); 
+        
+                document.getElementById('answer-btn').onclick = async () => {
+                    if ("vibrate" in navigator) navigator.vibrate(0); // 진동 멈춤
+                    sound.loop = false;
+                    sound.pause();
+                    
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    incomingCall.answer(localStream);
+                    handleCallStream(incomingCall);
+                };
+                
+                // 거절 시 처리
+                document.getElementById('hangup-btn').onclick = () => {
+                    if ("vibrate" in navigator) navigator.vibrate(0);
+                    sound.loop = false;
+                    sound.pause();
+                    incomingCall.close();
+                    endCallUI();
+                };
+            });
+        };
+
+        // 삭제예정
+        const initPeer_not_use = (uid) => {
             peer = new Peer(uid);
             peer.on('call', async (incomingCall) => {
                 showCallOverlay("상대방", "", true); 
