@@ -313,8 +313,19 @@
         // --- 알림 로직 ---
         const triggerNoti = (msg, rid, roomName) => {
             if (msg.uid === currentUser.uid || currentRoomId === rid) return;
+
+            // 소리 재생 부분 보강
             const sound = document.getElementById('noti-sound');
-            sound.currentTime = 0; sound.play().catch(() => {});
+            if (sound) {
+                sound.currentTime = 0; // 재생 위치를 처음으로
+                // play()는 Promise를 반환하므로 catch를 통해 에러(차단 등)를 확인해야 합니다.
+                sound.play().catch(error => {
+                    console.log("오디오 재생이 차단되었습니다 (사용자 상호작용 필요):", error);
+                });
+            }
+            //const sound = document.getElementById('noti-sound');
+            //sound.currentTime = 0; sound.play().catch(() => {});
+            
             const toast = document.getElementById('notification-toast');
             document.getElementById('noti-msg').innerText = `[${roomName}] ${msg.userName}: ${msg.text}`;
             toast.classList.add('show');
