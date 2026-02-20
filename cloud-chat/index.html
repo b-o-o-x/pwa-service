@@ -367,67 +367,44 @@
         };
 
         // --- 3. 방 입장 & 암호 체크 (기존 유지) ---
-        // enterRoom 함수 수정
         const enterRoom = async (id, room) => {
             if (currentRoomId === id) return;
             
-            // 이전 리스너 확실히 제거
-            if (unsubscribeMessages) {
-                unsubscribeMessages();
-                unsubscribeMessages = null;
-            }
-        
-            const memberRef = doc(db, `rooms/${id}/members`, currentUser.uid);
-            let memberSnap = await getDoc(memberRef);
-            const isJoined = memberSnap.exists() || room.owner === currentUser.uid;
-        
-            if (!isJoined) {
-                if (room.password) {
-                    const pw = prompt("비밀번호를 입력하세요:");
-                    if (pw !== room.password) return alert("비밀번호가 틀렸습니다.");
-                }
-                await setDoc(memberRef, { joinedAt: serverTimestamp() });
-            }
-        
-            // 상태 초기화
+            // 1. 초기화
             isInitialLoad = true; 
-            lastDateStr = null;
+            lastDateStr = null; // 날짜 구분선 초기화 중요!
             currentRoomId = id;
             
             const box = document.getElementById('messages');
-            box.innerHTML = ''; // 화면 비우기
+            box.innerHTML = ''; // 화면 깨끗이 비우기
         
+            // 2. UI 전환
             document.body.classList.add('chat-open');
             document.getElementById('chat-welcome').classList.add('hidden');
             document.getElementById('chat-section').classList.remove('hidden');
             document.getElementById('current-room-title').innerText = room.name;
         
-            localStorage.setItem(`lastRead_${id}_${currentUser.uid}`, Date.now());
+            // 3. 메시지 로드
             loadMessages(id);
         };
         
-        // loadMessages 내부 수정
         const loadMessages = (rid) => {
+            // 이전 리스너가 있다면 제거
+            if (unsubscribeMessages) unsubscribeMessages();
+        
             const q = query(collection(db, `rooms/${rid}/messages`), orderBy("createdAt", "asc"));
             unsubscribeMessages = onSnapshot(q, (snap) => {
                 const box = document.getElementById('messages');
                 
-                // 중요: 스냅샷이 비어있는 경우 대응
-                if (snap.empty) {
-                    isInitialLoad = false;
-                    return;
-                }
-        
                 snap.docChanges().forEach(change => {
                     if (change.type === "added") {
                         const m = change.doc.data();
                         
-                        // 시간 데이터가 서버에서 확정될 때까지 기다림 (null 방지)
-                        if (!m.createdAt) return; 
-        
-                        const dateObj = m.createdAt.toDate();
+                        // [수정 포인트] 서버 시간이 아직 안 찍혔다면 브라우저 현재 시간을 임시로 사용
+                        const dateObj = m.createdAt ? m.createdAt.toDate() : new Date();
                         const dStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`;
                         
+                        // 날짜 구분선 추가 로직
                         if (lastDateStr !== dStr) {
                             const divider = document.createElement('div');
                             divider.className = 'date-divider';
@@ -436,10 +413,11 @@
                             lastDateStr = dStr;
                         }
                         
+                        // 메시지 렌더링
                         renderMsg(m, box);
                         
-                        // 앱이 활성화된 상태(포그라운드)에서만 커스텀 토스트 알림을 띄움
-                        if (!isInitialLoad && !document.hidden) {
+                        // 알림 처리: 내가 보낸 게 아닐 때만
+                        if (!isInitialLoad && m.uid !== currentUser.uid) {
                             triggerNoti(m, rid);
                         }
                         
