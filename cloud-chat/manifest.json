@@ -1,7 +1,7 @@
 {
   "name": "A♥️J Cloud Chat",
   "short_name": "A♥️JCloudChat",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
