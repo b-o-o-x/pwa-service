@@ -363,23 +363,42 @@
             badge.classList.remove('hidden');
         };
 
-        // --- 방 입장 로직 (버그 수정됨) ---
+        // --- 방 입장 로직 (비밀번호 검증 추가) ---
         const enterRoom = async (id, room) => {
             if (currentRoomId === id) return;
-            
+        
+            // 1. 참여 여부 확인 (본인이 만든 방이거나 이미 멤버인 경우 패스)
+            const memberRef = doc(db, `rooms/${id}/members`, currentUser.uid);
+            const memberSnap = await getDoc(memberRef);
+            const isJoined = memberSnap.exists() || room.owner === currentUser.uid;
+        
+            // 2. 비밀번호가 걸려있고 아직 참여하지 않은 방이라면?
+            if (room.password && !isJoined) {
+                const inputPw = prompt("비밀번호가 걸려있는 방입니다. 암호를 입력하세요:");
+                if (inputPw === null) return; // 취소 버튼 클릭 시 종료
+                
+                if (inputPw !== room.password) {
+                    alert("비밀번호가 일치하지 않습니다.");
+                    return;
+                }
+                
+                // 비밀번호가 맞다면 멤버로 등록 (다음 입장 시 안 물어보게 함)
+                await setDoc(memberRef, { joinedAt: serverTimestamp() });
+            }
+        
+            // 3. 실제 입장 처리 (기존 로직)
             isInitialLoad = true; 
             lastDateStr = null; 
             currentRoomId = id;
             
             const box = document.getElementById('messages');
             box.innerHTML = ''; 
-
+        
             document.body.classList.add('chat-open');
             document.getElementById('chat-welcome').classList.add('hidden');
             document.getElementById('chat-section').classList.remove('hidden');
             document.getElementById('current-room-title').innerText = room.name;
-
-            // 들어가면 해당 방 뱃지 숨김
+        
             const badge = document.getElementById(`badge-${id}`);
             if(badge) { badge.innerText = "0"; badge.classList.add('hidden'); }
         
